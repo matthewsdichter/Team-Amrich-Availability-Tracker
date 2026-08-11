@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Amrich Availability Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232a78d6'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3ETA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Team Amrich</h1>
+        <span class="brand-sub">Availability Tracker</span>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn btn-ghost" id="btn-import">Import CSV</button>
+        <input type="file" id="import-file" accept=".csv" hidden>
+        <button type="button" class="btn btn-ghost" id="btn-export">Export CSV</button>
+        <button type="button" class="btn btn-primary" id="btn-add">+ Add availability</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- Summary stat tiles -->
+    <section class="stat-row" aria-label="Summary">
+      <div class="stat-tile">
+        <span class="stat-label">Active availabilities</span>
+        <span class="stat-value" id="stat-count">0</span>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label">Total available RSF</span>
+        <span class="stat-value" id="stat-rsf">0</span>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label">Avg asking rent</span>
+        <span class="stat-value" id="stat-rent">&ndash;</span>
+      </div>
+      <div class="stat-tile">
+        <span class="stat-label">Leased this year</span>
+        <span class="stat-value" id="stat-leased">0</span>
+      </div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filter-row" aria-label="Filters">
+      <input type="search" id="search" class="input search-input" placeholder="Search building, suite, broker, notes&hellip;" aria-label="Search availabilities">
+      <select id="filter-status" class="input" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="Available">Available</option>
+        <option value="Negotiating">Negotiating</option>
+        <option value="Lease Out">Lease Out</option>
+        <option value="Leased">Leased</option>
+        <option value="Off Market">Off Market</option>
+      </select>
+      <select id="filter-type" class="input" aria-label="Filter by lease type">
+        <option value="">All lease types</option>
+        <option value="Direct">Direct</option>
+        <option value="Sublease">Sublease</option>
+      </select>
+      <span class="filter-count" id="filter-count"></span>
+    </section>
+
+    <!-- Table -->
+    <section class="table-wrap">
+      <table class="avail-table" id="avail-table">
+        <thead>
+          <tr>
+            <th data-sort="building" class="sortable">Building</th>
+            <th data-sort="suite" class="sortable">Floor / Suite</th>
+            <th data-sort="rsf" class="sortable num">RSF</th>
+            <th data-sort="rent" class="sortable num">Asking ($/SF/yr)</th>
+            <th data-sort="leaseType" class="sortable">Type</th>
+            <th data-sort="possession" class="sortable">Possession</th>
+            <th data-sort="condition" class="sortable">Condition</th>
+            <th data-sort="status" class="sortable">Status</th>
+            <th data-sort="broker" class="sortable">Broker</th>
+            <th data-sort="updated" class="sortable">Updated</th>
+            <th class="actions-col" aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="empty-state" id="empty-state" hidden>
+        <p class="empty-title">No availabilities yet</p>
+        <p class="empty-sub">Add your first listing, import a CSV, or start from sample data.</p>
+        <button type="button" class="btn btn-ghost" id="btn-sample">Load sample data</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add / Edit modal -->
+  <dialog id="modal" class="modal">
+    <form method="dialog" id="avail-form" novalidate>
+      <h2 id="modal-title">Add availability</h2>
+      <div class="form-grid">
+        <label class="field span-2">
+          <span>Building / Address *</span>
+          <input type="text" name="building" required placeholder="e.g. 555 Madison Avenue">
+        </label>
+        <label class="field">
+          <span>Floor / Suite *</span>
+          <input type="text" name="suite" required placeholder="e.g. 12th Floor / Suite 1200">
+        </label>
+        <label class="field">
+          <span>Size (RSF) *</span>
+          <input type="number" name="rsf" required min="0" step="1" placeholder="e.g. 8500">
+        </label>
+        <label class="field">
+          <span>Asking rent ($/SF/yr)</span>
+          <input type="number" name="rent" min="0" step="0.01" placeholder="e.g. 68">
+        </label>
+        <label class="field">
+          <span>Lease type</span>
+          <select name="leaseType">
+            <option value="Direct">Direct</option>
+            <option value="Sublease">Sublease</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Possession</span>
+          <input type="text" name="possession" placeholder="e.g. Immediate, Q1 2027">
+        </label>
+        <label class="field">
+          <span>Condition</span>
+          <select name="condition">
+            <option value="">&mdash;</option>
+            <option value="Built">Built</option>
+            <option value="White Box">White Box</option>
+            <option value="Prebuilt">Prebuilt</option>
+            <option value="Raw">Raw</option>
+            <option value="As-Is">As-Is</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Status</span>
+          <select name="status">
+            <option value="Available">Available</option>
+            <option value="Negotiating">Negotiating</option>
+            <option value="Lease Out">Lease Out</option>
+            <option value="Leased">Leased</option>
+            <option value="Off Market">Off Market</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Listing broker</span>
+          <input type="text" name="broker" placeholder="e.g. M. Dichter">
+        </label>
+        <label class="field span-2">
+          <span>Notes</span>
+          <textarea name="notes" rows="3" placeholder="Term, escalations, work letter, comments&hellip;"></textarea>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

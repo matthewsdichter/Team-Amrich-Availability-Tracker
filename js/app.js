@@ -1,88 +1,36 @@
-/* Team Amrich Availability Tracker — vanilla JS, localStorage persistence. */
+/* Team Amrich Availability Tracker
+   Search (size range + condition), Leaflet map, and contiguous-block engine
+   over the dataset in js/data.js. */
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "team-amrich-availabilities";
-
-  var STATUSES = ["Available", "Negotiating", "Lease Out", "Leased", "Off Market"];
-  var ACTIVE_STATUSES = ["Available", "Negotiating", "Lease Out"];
-
-  var CSV_COLUMNS = [
-    { key: "building", label: "Building" },
-    { key: "suite", label: "Floor/Suite" },
-    { key: "rsf", label: "RSF" },
-    { key: "rent", label: "Asking Rent ($/SF/yr)" },
-    { key: "leaseType", label: "Lease Type" },
-    { key: "possession", label: "Possession" },
-    { key: "condition", label: "Condition" },
-    { key: "status", label: "Status" },
-    { key: "broker", label: "Broker" },
-    { key: "notes", label: "Notes" },
-    { key: "updated", label: "Updated" }
-  ];
-
-  var SAMPLE_DATA = [
-    { building: "555 Madison Avenue", suite: "Entire 12th Floor", rsf: 12400, rent: 78, leaseType: "Direct", possession: "Immediate", condition: "White Box", status: "Available", broker: "M. Dichter", notes: "Full floor identity, new installation by landlord considered." },
-    { building: "555 Madison Avenue", suite: "Suite 810", rsf: 4150, rent: 72, leaseType: "Direct", possession: "Immediate", condition: "Prebuilt", status: "Negotiating", broker: "M. Dichter", notes: "LOI out; 7-year term discussed." },
-    { building: "410 Park Avenue", suite: "Suite 1520", rsf: 6800, rent: 95, leaseType: "Sublease", possession: "Q1 2027", condition: "Built", status: "Available", broker: "M. Dichter", notes: "Furnished sublease through 2031, term-coterminous only." },
-    { building: "1180 Sixth Avenue", suite: "Entire 21st Floor", rsf: 15750, rent: 62, leaseType: "Direct", possession: "Arranged", condition: "Raw", status: "Lease Out", broker: "M. Dichter", notes: "Lease out for signature; backup offers welcome." },
-    { building: "230 Park Avenue South", suite: "Suite 400", rsf: 9200, rent: 68, leaseType: "Direct", possession: "Immediate", condition: "As-Is", status: "Leased", broker: "M. Dichter", notes: "Signed June 2026 — 10-year term." }
-  ];
-
-  var state = {
-    items: [],
-    search: "",
-    filterStatus: "",
-    filterType: "",
-    sortKey: "building",
-    sortDir: 1,
-    editingId: null
+  // ---------- Condition buckets ----------
+  // The filter exposes three buckets; Whiteboxed and Raw share one.
+  var BUCKETS = {
+    "wb-raw": ["Whiteboxed", "Raw"],
+    "2nd-gen": ["2nd Gen"],
+    "prebuilt": ["Prebuilt"]
   };
 
-  // ---------- Persistence ----------
-
-  function load() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      state.items = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      state.items = [];
-    }
-  }
-
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
-  }
-
-  function makeId() {
-    return "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  }
+  var state = {
+    minSf: null,
+    maxSf: null,
+    conditions: [],   // active bucket keys
+    immediateOnly: false
+  };
 
   // ---------- Formatting ----------
 
-  function fmtInt(n) {
-    return Number(n || 0).toLocaleString("en-US");
-  }
-
-  function fmtRent(n) {
-    if (n === "" || n == null || isNaN(n)) return "–";
-    return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
+  function fmtInt(n) { return Number(n || 0).toLocaleString("en-US"); }
 
   function fmtCompact(n) {
-    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
-    if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    if (n >= 1e6) return (n / 1e6).toFixed(2).replace(/0$/, "").replace(/\.$/, "") + "M";
+    if (n >= 10000) return Math.round(n / 1000) + "K";
     return fmtInt(n);
   }
 
-  function fmtDate(iso) {
-    if (!iso) return "–";
-    var d = new Date(iso);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  }
-
-  function statusClass(status) {
-    return "status-" + String(status || "").toLowerCase().replace(/\s+/g, "-");
+  function fmtAsk(ask) {
+    return ask == null ? "Ask TBD" : "$" + fmtInt(ask) + "/SF";
   }
 
   function escapeHtml(s) {
@@ -91,334 +39,408 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
-  // ---------- Filtering / sorting ----------
+  // ---------- Predicates ----------
 
-  function visibleItems() {
-    var q = state.search.trim().toLowerCase();
-    var items = state.items.filter(function (it) {
-      if (state.filterStatus && it.status !== state.filterStatus) return false;
-      if (state.filterType && it.leaseType !== state.filterType) return false;
-      if (!q) return true;
-      return ["building", "suite", "broker", "notes", "possession", "condition", "status"]
-        .some(function (k) { return String(it[k] || "").toLowerCase().indexOf(q) !== -1; });
-    });
+  function isFullFloor(space) { return space.unit.charAt(0) === "E"; }
+  function isActive(space) { return space.status === "Available"; }
+  function isImmediate(space) { return String(space.available).toLowerCase() === "immediate"; }
 
-    var key = state.sortKey, dir = state.sortDir;
-    items.sort(function (a, b) {
-      var av = a[key], bv = b[key];
-      if (key === "rsf" || key === "rent") {
-        av = av === "" || av == null ? -Infinity : Number(av);
-        bv = bv === "" || bv == null ? -Infinity : Number(bv);
-        return (av - bv) * dir;
-      }
-      return String(av || "").localeCompare(String(bv || ""), "en", { sensitivity: "base" }) * dir;
+  function conditionMatches(space) {
+    if (!state.conditions.length) return true;
+    if (space.condition == null) return false; // unknown condition can't satisfy a condition filter
+    return state.conditions.some(function (key) {
+      return BUCKETS[key].indexOf(space.condition) !== -1;
     });
-    return items;
   }
 
-  // ---------- Rendering ----------
+  function sizeMatches(rsf) {
+    if (state.minSf != null && rsf < state.minSf) return false;
+    if (state.maxSf != null && rsf > state.maxSf) return false;
+    return true;
+  }
+
+  function hasSizeFilter() { return state.minSf != null || state.maxSf != null; }
+  function hasAnyFilter() { return hasSizeFilter() || state.conditions.length > 0 || state.immediateOnly; }
+
+  function spaceMatchesFilters(space) {
+    if (!isActive(space)) return false;
+    if (!conditionMatches(space)) return false;
+    if (state.immediateOnly && !isImmediate(space)) return false;
+    return sizeMatches(space.rsf);
+  }
+
+  // A block member must satisfy every non-size filter for the block to count.
+  function memberOk(space) {
+    if (!isActive(space)) return false;
+    if (!conditionMatches(space)) return false;
+    if (state.immediateOnly && !isImmediate(space)) return false;
+    return true;
+  }
+
+  // ---------- Contiguous-block engine ----------
+  // Consecutive full floors in a building are contiguous. Explicit `links`
+  // add connections that aren't consecutive full floors (e.g. a slab cut
+  // between a partial floor and the floor above).
+
+  function blockAskFor(building, spaces) {
+    // If the building has a block-deal ask covering every floor in the run, use it.
+    var ba = building.blockAsk;
+    if (ba && spaces.every(function (s) { return s.floor >= ba.from && s.floor <= ba.to; })) {
+      return { ask: ba.ask, label: "$" + fmtInt(ba.ask) + "/SF (block)", note: ba.note };
+    }
+    var asks = spaces.map(function (s) { return s.ask; });
+    if (asks.some(function (a) { return a == null; })) {
+      var known = asks.filter(function (a) { return a != null; });
+      return { ask: null, label: known.length ? "Ask partly TBD" : "Ask TBD", note: null };
+    }
+    var totalRsf = spaces.reduce(function (t, s) { return t + s.rsf; }, 0);
+    var blended = spaces.reduce(function (t, s) { return t + s.ask * s.rsf; }, 0) / totalRsf;
+    return { ask: blended, label: "$" + Math.round(blended) + "/SF blended", note: null };
+  }
+
+  function blockAvailability(spaces) {
+    var vals = spaces.map(function (s) { return String(s.available); });
+    if (vals.some(function (v) { return v.toLowerCase() === "tbd"; })) return "Timing TBD on some floors";
+    var later = vals.filter(function (v) { return v.toLowerCase() !== "immediate"; });
+    if (!later.length) return "Immediate";
+    var uniq = later.filter(function (v, i) { return later.indexOf(v) === i; });
+    return "From " + uniq.join(" / ");
+  }
+
+  function makeBlock(building, spaces) {
+    var sorted = spaces.slice().sort(function (a, b) { return a.floor - b.floor; });
+    var rsf = sorted.reduce(function (t, s) { return t + s.rsf; }, 0);
+    return {
+      building: building,
+      spaces: sorted,
+      units: sorted.map(function (s) { return s.unit; }),
+      rsf: rsf,
+      askInfo: blockAskFor(building, sorted),
+      available: blockAvailability(sorted),
+      label: sorted[0].unit + "–" + sorted[sorted.length - 1].unit
+    };
+  }
+
+  // All contiguous runs of length >= 2 whose members pass `filter`.
+  function enumerateBlocks(building, filter) {
+    var blocks = [];
+    var full = building.spaces.filter(function (s) { return isFullFloor(s) && filter(s); })
+      .sort(function (a, b) { return a.floor - b.floor; });
+
+    // Split into consecutive runs, then enumerate every sub-run of length >= 2.
+    var runs = [];
+    var run = [];
+    full.forEach(function (s) {
+      if (run.length && s.floor === run[run.length - 1].floor + 1) run.push(s);
+      else { if (run.length) runs.push(run); run = [s]; }
+    });
+    if (run.length) runs.push(run);
+
+    runs.forEach(function (r) {
+      for (var i = 0; i < r.length; i++) {
+        for (var j = i + 1; j < r.length; j++) {
+          blocks.push(makeBlock(building, r.slice(i, j + 1)));
+        }
+      }
+    });
+
+    // Explicitly linked units (e.g. P17+E18 slab cut).
+    (building.links || []).forEach(function (pair) {
+      var members = pair.map(function (unit) {
+        return building.spaces.find(function (s) { return s.unit === unit; });
+      });
+      if (members.every(function (s) { return s && filter(s); })) {
+        var b = makeBlock(building, members);
+        b.linked = true;
+        blocks.push(b);
+      }
+    });
+
+    return blocks;
+  }
+
+  // Maximal contiguous runs (for the default view / header stat).
+  function maximalBlocks(building, filter) {
+    var all = enumerateBlocks(building, filter);
+    return all.filter(function (b) {
+      return !all.some(function (other) {
+        if (other === b) return false;
+        return b.units.every(function (u) { return other.units.indexOf(u) !== -1; });
+      });
+    });
+  }
+
+  // ---------- Search ----------
+
+  function buildingResults(building) {
+    var singles = building.spaces.filter(spaceMatchesFilters);
+    var blocks = [];
+    if (hasSizeFilter()) {
+      blocks = enumerateBlocks(building, memberOk).filter(function (b) { return sizeMatches(b.rsf); });
+      blocks.sort(function (a, b) { return a.rsf - b.rsf; });
+    }
+    return { building: building, singles: singles, blocks: blocks, count: singles.length + blocks.length };
+  }
+
+  // ---------- Header stats ----------
 
   function renderStats() {
-    var active = state.items.filter(function (it) { return ACTIVE_STATUSES.indexOf(it.status) !== -1; });
-    var totalRsf = active.reduce(function (s, it) { return s + (Number(it.rsf) || 0); }, 0);
-    var rents = active.map(function (it) { return Number(it.rent); }).filter(function (n) { return !isNaN(n) && n > 0; });
-    var avgRent = rents.length ? rents.reduce(function (s, n) { return s + n; }, 0) / rents.length : null;
-    var year = new Date().getFullYear();
-    var leased = state.items.filter(function (it) {
-      return it.status === "Leased" && it.updated && new Date(it.updated).getFullYear() === year;
-    }).length;
-
-    document.getElementById("stat-count").textContent = fmtInt(active.length);
-    document.getElementById("stat-rsf").textContent = fmtCompact(totalRsf);
-    document.getElementById("stat-rent").textContent = avgRent == null ? "–" : "$" + avgRent.toFixed(2);
-    document.getElementById("stat-leased").textContent = fmtInt(leased);
+    var buildings = BUILDINGS.length;
+    var spaces = 0, rsf = 0, largest = null;
+    BUILDINGS.forEach(function (b) {
+      b.spaces.forEach(function (s) {
+        if (isActive(s)) { spaces++; rsf += s.rsf; }
+      });
+      maximalBlocks(b, isActive).forEach(function (blk) {
+        if (!largest || blk.rsf > largest.rsf) largest = blk;
+      });
+    });
+    document.getElementById("stat-buildings").textContent = fmtInt(buildings);
+    document.getElementById("stat-spaces").textContent = fmtInt(spaces);
+    document.getElementById("stat-rsf").textContent = fmtCompact(rsf);
+    document.getElementById("stat-block").textContent = largest ? fmtCompact(largest.rsf) : "–";
+    var tile = document.getElementById("stat-block").parentElement;
+    if (largest) tile.title = largest.building.name + " " + largest.label + " — " + fmtInt(largest.rsf) + " RSF";
   }
 
-  function renderTable() {
-    var items = visibleItems();
-    var body = document.getElementById("table-body");
-    var empty = document.getElementById("empty-state");
-    var table = document.getElementById("avail-table");
+  // ---------- Results panel ----------
 
-    document.querySelectorAll(".avail-table th.sortable").forEach(function (th) {
-      th.classList.remove("sorted-asc", "sorted-desc");
-      if (th.dataset.sort === state.sortKey) {
-        th.classList.add(state.sortDir === 1 ? "sorted-asc" : "sorted-desc");
-      }
-    });
+  function statusBadge(space) {
+    var cls = space.status === "Available" ? "st-available" : "st-lease-out";
+    return "<span class=\"status-badge " + cls + "\"><span class=\"dot\"></span>" + escapeHtml(space.status) + "</span>";
+  }
 
-    if (state.items.length === 0) {
-      table.hidden = true;
-      empty.hidden = false;
-      document.getElementById("filter-count").textContent = "";
+  function singleRow(space) {
+    var leaseOut = space.status !== "Available";
+    return "<div class=\"match-row" + (leaseOut ? " lease-out" : "") + "\">" +
+      "<span class=\"match-unit\">" + escapeHtml(space.unit) + "</span>" +
+      "<div class=\"match-detail\">" +
+        "<div class=\"match-line-1\">" +
+          "<span class=\"match-rsf\">" + fmtInt(space.rsf) + " RSF</span>" +
+          "<span class=\"match-ask\">" + fmtAsk(space.ask) + (space.askLab ? " · $" + fmtInt(space.askLab) + " NNN lab" : "") + "</span>" +
+          "<span class=\"match-cond\">" + escapeHtml(space.condition || "Condition TBD") + "</span>" +
+          "<span class=\"match-avail\">" + escapeHtml(space.available) + "</span>" +
+          (leaseOut ? statusBadge(space) : "") +
+        "</div>" +
+        (space.notes ? "<div class=\"match-notes\">" + escapeHtml(space.notes) + "</div>" : "") +
+      "</div>" +
+    "</div>";
+  }
+
+  function blockRow(block) {
+    var conds = block.spaces.map(function (s) { return s.condition || "TBD"; });
+    var uniqConds = conds.filter(function (c, i) { return conds.indexOf(c) === i; });
+    return "<div class=\"match-row block-row\">" +
+      "<span class=\"match-unit\">" + escapeHtml(block.label) + "</span>" +
+      "<div class=\"match-detail\">" +
+        "<div class=\"match-line-1\">" +
+          "<span class=\"block-tag\">" + (block.linked ? "Connected" : "Contiguous") + " · " + block.spaces.length + " floors</span>" +
+          "<span class=\"match-rsf\">" + fmtInt(block.rsf) + " RSF</span>" +
+          "<span class=\"match-ask\">" + escapeHtml(block.askInfo.label) + "</span>" +
+          "<span class=\"match-cond\">" + escapeHtml(uniqConds.join(" + ")) + "</span>" +
+          "<span class=\"match-avail\">" + escapeHtml(block.available) + "</span>" +
+        "</div>" +
+        (block.askInfo.note ? "<div class=\"match-notes\">" + escapeHtml(block.askInfo.note) + "</div>" : "") +
+      "</div>" +
+    "</div>";
+  }
+
+  function renderResults(results) {
+    var container = document.getElementById("results");
+    var filtering = hasAnyFilter();
+    var shown = filtering ? results.filter(function (r) { return r.count > 0; }) : results;
+
+    if (!shown.length) {
+      container.innerHTML = "<div class=\"empty-results\"><p><strong>No spaces match.</strong></p>" +
+        "<p>Try widening the size range or removing a condition filter.<br>" +
+        "Contiguous multi-floor blocks are searched automatically.</p></div>";
       return;
     }
-    table.hidden = false;
-    empty.hidden = true;
 
-    body.innerHTML = items.map(function (it) {
-      return "<tr data-id=\"" + it.id + "\">" +
-        "<td class=\"building-cell wrap\">" + escapeHtml(it.building) +
-          (it.notes ? "<div class=\"notes-cell\">" + escapeHtml(it.notes) + "</div>" : "") + "</td>" +
-        "<td>" + escapeHtml(it.suite) + "</td>" +
-        "<td class=\"num\">" + fmtInt(it.rsf) + "</td>" +
-        "<td class=\"num\">" + fmtRent(it.rent) + "</td>" +
-        "<td>" + escapeHtml(it.leaseType) + "</td>" +
-        "<td>" + escapeHtml(it.possession || "–") + "</td>" +
-        "<td>" + escapeHtml(it.condition || "–") + "</td>" +
-        "<td><span class=\"status-badge " + statusClass(it.status) + "\"><span class=\"dot\"></span>" + escapeHtml(it.status) + "</span></td>" +
-        "<td>" + escapeHtml(it.broker || "–") + "</td>" +
-        "<td>" + fmtDate(it.updated) + "</td>" +
-        "<td class=\"actions-cell\">" +
-          "<button type=\"button\" class=\"btn-icon\" data-action=\"edit\" title=\"Edit\" aria-label=\"Edit\">✎</button>" +
-          "<button type=\"button\" class=\"btn-icon danger\" data-action=\"delete\" title=\"Delete\" aria-label=\"Delete\">✕</button>" +
-        "</td>" +
-      "</tr>";
+    container.innerHTML = shown.map(function (r) {
+      var b = r.building;
+      var rows = "";
+
+      // Contiguous blocks first — they're the suggestion the size search exists for.
+      rows += r.blocks.map(blockRow).join("");
+
+      if (filtering) {
+        rows += r.singles.map(singleRow).join("");
+      } else {
+        // Default view: full inventory, top floor first, lease-outs included.
+        rows += b.spaces.slice().sort(function (x, y) { return y.floor - x.floor; }).map(singleRow).join("");
+      }
+
+      var activeSpaces = b.spaces.filter(isActive);
+      var totalRsf = activeSpaces.reduce(function (t, s) { return t + s.rsf; }, 0);
+      var maxBlocks = maximalBlocks(b, isActive);
+      var tally = activeSpaces.length + " space" + (activeSpaces.length === 1 ? "" : "s") +
+        " · " + fmtInt(totalRsf) + " RSF available";
+      if (maxBlocks.length) {
+        tally += " · Contiguous: " + maxBlocks.map(function (blk) {
+          return blk.label + " (" + fmtInt(blk.rsf) + " RSF)";
+        }).join(", ");
+      }
+
+      return "<div class=\"bldg-card\" id=\"card-" + b.id + "\">" +
+        "<div class=\"bldg-head\" data-bldg=\"" + b.id + "\">" +
+          "<h2 class=\"bldg-name\">" + escapeHtml(b.name) + "</h2>" +
+          "<div class=\"bldg-meta\">" + escapeHtml(b.address) + " · " + escapeHtml(b.submarket) + "</div>" +
+          "<div class=\"bldg-tally\">" + tally + "</div>" +
+        "</div>" +
+        "<div class=\"match-list\">" + rows + "</div>" +
+      "</div>";
     }).join("");
-
-    var count = document.getElementById("filter-count");
-    count.textContent = items.length === state.items.length
-      ? state.items.length + " listing" + (state.items.length === 1 ? "" : "s")
-      : items.length + " of " + state.items.length + " listings";
   }
 
-  function render() {
-    renderStats();
-    renderTable();
-  }
-
-  // ---------- Modal ----------
-
-  var modal = document.getElementById("modal");
-  var form = document.getElementById("avail-form");
-
-  function openModal(item) {
-    state.editingId = item ? item.id : null;
-    document.getElementById("modal-title").textContent = item ? "Edit availability" : "Add availability";
-    form.reset();
-    if (item) {
-      Array.prototype.forEach.call(form.elements, function (el) {
-        if (el.name && item[el.name] != null) el.value = item[el.name];
-      });
-    }
-    modal.showModal();
-    form.elements.building.focus();
-  }
-
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    if (!form.reportValidity()) return;
-
-    var data = {
-      building: form.elements.building.value.trim(),
-      suite: form.elements.suite.value.trim(),
-      rsf: Number(form.elements.rsf.value) || 0,
-      rent: form.elements.rent.value === "" ? "" : Number(form.elements.rent.value),
-      leaseType: form.elements.leaseType.value,
-      possession: form.elements.possession.value.trim(),
-      condition: form.elements.condition.value,
-      status: form.elements.status.value,
-      broker: form.elements.broker.value.trim(),
-      notes: form.elements.notes.value.trim(),
-      updated: new Date().toISOString()
-    };
-
-    if (state.editingId) {
-      var idx = state.items.findIndex(function (it) { return it.id === state.editingId; });
-      if (idx !== -1) {
-        data.id = state.editingId;
-        state.items[idx] = data;
-      }
-    } else {
-      data.id = makeId();
-      state.items.push(data);
-    }
-    save();
-    render();
-    modal.close();
-  });
-
-  document.getElementById("btn-cancel").addEventListener("click", function () {
-    modal.close();
-  });
-
-  // ---------- CSV export / import ----------
-
-  function csvEscape(v) {
-    var s = String(v == null ? "" : v);
-    if (/[",\n]/.test(s)) return "\"" + s.replace(/"/g, "\"\"") + "\"";
-    return s;
-  }
-
-  function exportCsv() {
-    var rows = [CSV_COLUMNS.map(function (c) { return csvEscape(c.label); }).join(",")];
-    state.items.forEach(function (it) {
-      rows.push(CSV_COLUMNS.map(function (c) { return csvEscape(it[c.key]); }).join(","));
-    });
-    var blob = new Blob([rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "team-amrich-availabilities.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  function parseCsv(text) {
-    var rows = [];
-    var row = [];
-    var cell = "";
-    var inQuotes = false;
-    for (var i = 0; i < text.length; i++) {
-      var ch = text[i];
-      if (inQuotes) {
-        if (ch === "\"") {
-          if (text[i + 1] === "\"") { cell += "\""; i++; }
-          else inQuotes = false;
-        } else cell += ch;
-      } else if (ch === "\"") {
-        inQuotes = true;
-      } else if (ch === ",") {
-        row.push(cell); cell = "";
-      } else if (ch === "\n" || ch === "\r") {
-        if (ch === "\r" && text[i + 1] === "\n") i++;
-        row.push(cell); cell = "";
-        rows.push(row); row = [];
-      } else {
-        cell += ch;
-      }
-    }
-    if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
-    return rows.filter(function (r) { return r.some(function (c) { return c.trim() !== ""; }); });
-  }
-
-  function importCsv(text) {
-    var rows = parseCsv(text);
-    if (rows.length < 2) {
-      alert("No data rows found in that CSV.");
+  function renderSummary(results) {
+    var el = document.getElementById("result-summary");
+    if (!hasAnyFilter()) {
+      el.textContent = "Showing full inventory";
       return;
     }
-    var header = rows[0].map(function (h) { return h.trim().toLowerCase(); });
-    var colIndex = {};
-    CSV_COLUMNS.forEach(function (c) {
-      var i = header.indexOf(c.label.toLowerCase());
-      if (i === -1 && c.key === "suite") i = header.indexOf("suite");
-      if (i === -1 && c.key === "rent") i = header.indexOf("asking rent");
-      colIndex[c.key] = i;
+    var singles = 0, blocks = 0, bldgs = 0;
+    results.forEach(function (r) {
+      if (r.count > 0) bldgs++;
+      singles += r.singles.length;
+      blocks += r.blocks.length;
     });
-    if (colIndex.building === -1) {
-      alert("CSV must include a \"Building\" column. Export a CSV from this app to see the expected format.");
-      return;
-    }
-
-    var imported = 0;
-    rows.slice(1).forEach(function (r) {
-      function get(key) {
-        var i = colIndex[key];
-        return i === -1 || r[i] == null ? "" : r[i].trim();
-      }
-      var building = get("building");
-      if (!building) return;
-      var status = get("status");
-      if (STATUSES.indexOf(status) === -1) status = "Available";
-      state.items.push({
-        id: makeId(),
-        building: building,
-        suite: get("suite"),
-        rsf: Number(String(get("rsf")).replace(/[^0-9.]/g, "")) || 0,
-        rent: get("rent") === "" ? "" : Number(String(get("rent")).replace(/[^0-9.]/g, "")) || "",
-        leaseType: get("leaseType") === "Sublease" ? "Sublease" : "Direct",
-        possession: get("possession"),
-        condition: get("condition"),
-        status: status,
-        broker: get("broker"),
-        notes: get("notes"),
-        updated: get("updated") && !isNaN(Date.parse(get("updated"))) ? new Date(get("updated")).toISOString() : new Date().toISOString()
-      });
-      imported++;
-    });
-    save();
-    render();
-    alert("Imported " + imported + " listing" + (imported === 1 ? "" : "s") + ".");
+    var parts = [];
+    if (singles) parts.push(singles + " space" + (singles === 1 ? "" : "s"));
+    if (blocks) parts.push(blocks + " contiguous option" + (blocks === 1 ? "" : "s"));
+    el.textContent = parts.length
+      ? parts.join(" + ") + " in " + bldgs + " building" + (bldgs === 1 ? "" : "s")
+      : "No matches";
   }
 
-  // ---------- Events ----------
+  // ---------- Map ----------
 
-  document.getElementById("btn-add").addEventListener("click", function () { openModal(null); });
+  var map = L.map("map", { scrollWheelZoom: true, zoomSnap: 0.5 });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
+  }).addTo(map);
 
-  document.getElementById("btn-export").addEventListener("click", exportCsv);
+  var markers = {};
 
-  document.getElementById("btn-import").addEventListener("click", function () {
-    document.getElementById("import-file").click();
-  });
-
-  document.getElementById("import-file").addEventListener("change", function (e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function () { importCsv(String(reader.result)); };
-    reader.readAsText(file);
-    e.target.value = "";
-  });
-
-  document.getElementById("btn-sample").addEventListener("click", function () {
-    var now = new Date().toISOString();
-    state.items = SAMPLE_DATA.map(function (it) {
-      var copy = Object.assign({}, it);
-      copy.id = makeId();
-      copy.updated = now;
-      return copy;
+  function markerIcon(count, isMatch) {
+    var size = isMatch ? 34 : 26;
+    return L.divIcon({
+      className: "",
+      html: "<div class=\"marker-pin" + (isMatch ? "" : " no-match") + "\">" + count + "</div>",
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2]
     });
-    save();
-    render();
-  });
+  }
 
-  document.getElementById("table-body").addEventListener("click", function (e) {
-    var btn = e.target.closest("button[data-action]");
-    if (!btn) return;
-    var id = btn.closest("tr").dataset.id;
-    var item = state.items.find(function (it) { return it.id === id; });
-    if (!item) return;
-    if (btn.dataset.action === "edit") {
-      openModal(item);
-    } else if (btn.dataset.action === "delete") {
-      if (confirm("Delete " + item.building + (item.suite ? ", " + item.suite : "") + "?")) {
-        state.items = state.items.filter(function (it) { return it.id !== id; });
-        save();
-        render();
-      }
-    }
-  });
-
-  document.getElementById("search").addEventListener("input", function (e) {
-    state.search = e.target.value;
-    renderTable();
-  });
-
-  document.getElementById("filter-status").addEventListener("change", function (e) {
-    state.filterStatus = e.target.value;
-    renderTable();
-  });
-
-  document.getElementById("filter-type").addEventListener("change", function (e) {
-    state.filterType = e.target.value;
-    renderTable();
-  });
-
-  document.querySelectorAll(".avail-table th.sortable").forEach(function (th) {
-    th.addEventListener("click", function () {
-      var key = th.dataset.sort;
-      if (state.sortKey === key) {
-        state.sortDir = -state.sortDir;
-      } else {
-        state.sortKey = key;
-        state.sortDir = 1;
-      }
-      renderTable();
+  function popupHtml(result) {
+    var b = result.building;
+    var filtering = hasAnyFilter();
+    var items = [];
+    result.blocks.slice(0, 3).forEach(function (blk) {
+      items.push("<div><strong>" + escapeHtml(blk.label) + "</strong> · " + fmtInt(blk.rsf) +
+        " RSF · " + escapeHtml(blk.askInfo.label) + " · contiguous</div>");
     });
+    var singles = filtering ? result.singles : b.spaces.filter(isActive);
+    singles.slice(0, 4).forEach(function (s) {
+      items.push("<div><strong>" + escapeHtml(s.unit) + "</strong> · " + fmtInt(s.rsf) +
+        " RSF · " + fmtAsk(s.ask) + " · " + escapeHtml(s.condition || "Condition TBD") + "</div>");
+    });
+    var more = (result.blocks.length - Math.min(result.blocks.length, 3)) +
+               (singles.length - Math.min(singles.length, 4));
+    return "<div class=\"popup-name\">" + escapeHtml(b.name) + "</div>" +
+      "<div class=\"popup-meta\">" + escapeHtml(b.submarket) + "</div>" +
+      "<div class=\"popup-rows\">" + items.join("") + "</div>" +
+      (more > 0 ? "<div class=\"popup-more\">+ " + more + " more — see list</div>" : "");
+  }
+
+  function initMarkers() {
+    BUILDINGS.forEach(function (b) {
+      var m = L.marker([b.lat, b.lng], { icon: markerIcon(0, true), title: b.name }).addTo(map);
+      m.on("click", function () {
+        var card = document.getElementById("card-" + b.id);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      markers[b.id] = m;
+    });
+    var bounds = L.latLngBounds(BUILDINGS.map(function (b) { return [b.lat, b.lng]; }));
+    map.fitBounds(bounds, { padding: [40, 40] });
+  }
+
+  function updateMarkers(results) {
+    var filtering = hasAnyFilter();
+    results.forEach(function (r) {
+      var m = markers[r.building.id];
+      var activeCount = r.building.spaces.filter(isActive).length;
+      var count = filtering ? r.count : activeCount;
+      var isMatch = !filtering || r.count > 0;
+      m.setIcon(markerIcon(count, isMatch));
+      m.bindPopup(popupHtml(r));
+      m.setZIndexOffset(isMatch ? 500 : 0);
+    });
+  }
+
+  // ---------- Wiring ----------
+
+  function run() {
+    var results = BUILDINGS.map(buildingResults);
+    renderResults(results);
+    renderSummary(results);
+    updateMarkers(results);
+  }
+
+  function parseSf(value) {
+    var n = Number(String(value).replace(/[^0-9.]/g, ""));
+    return value.trim() === "" || isNaN(n) || n <= 0 ? null : n;
+  }
+
+  ["min-sf", "max-sf"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function (e) {
+      state[id === "min-sf" ? "minSf" : "maxSf"] = parseSf(e.target.value);
+      run();
+    });
+  });
+
+  document.querySelectorAll(".chip[data-condition]").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var key = chip.dataset.condition;
+      var idx = state.conditions.indexOf(key);
+      if (idx === -1) state.conditions.push(key);
+      else state.conditions.splice(idx, 1);
+      chip.classList.toggle("active", idx === -1);
+      run();
+    });
+  });
+
+  document.getElementById("immediate-only").addEventListener("change", function (e) {
+    state.immediateOnly = e.target.checked;
+    run();
+  });
+
+  document.getElementById("btn-clear").addEventListener("click", function () {
+    state.minSf = state.maxSf = null;
+    state.conditions = [];
+    state.immediateOnly = false;
+    document.getElementById("min-sf").value = "";
+    document.getElementById("max-sf").value = "";
+    document.getElementById("immediate-only").checked = false;
+    document.querySelectorAll(".chip.active").forEach(function (c) { c.classList.remove("active"); });
+    run();
+  });
+
+  // Clicking a building card header pans the map to it.
+  document.getElementById("results").addEventListener("click", function (e) {
+    var head = e.target.closest(".bldg-head");
+    if (!head) return;
+    var b = BUILDINGS.find(function (x) { return x.id === head.dataset.bldg; });
+    if (!b) return;
+    map.setView([b.lat, b.lng], Math.max(map.getZoom(), 15), { animate: true });
+    markers[b.id].openPopup();
   });
 
   // ---------- Init ----------
 
-  load();
-  render();
+  initMarkers();
+  renderStats();
+  run();
 })();

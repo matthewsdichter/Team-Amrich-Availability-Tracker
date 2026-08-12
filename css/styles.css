@@ -227,10 +227,75 @@ body {
 
 #results { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 
+/* ---------- Mobile: full-screen list/map with a bottom toggle ---------- */
+
+.mobile-toggle { display: none; }
+
 @media (max-width: 860px) {
+  .header-inner { padding: 10px 14px; gap: 8px; }
+
+  /* Stats condense to a single horizontally scrollable strip */
+  .header-stats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    scrollbar-width: none;
+  }
+  .header-stats::-webkit-scrollbar { display: none; }
+  .stat-tile { flex: none; padding: 4px 10px; }
+  .stat-value { font-size: 15px; }
+
+  /* Filter bar: chips scroll sideways instead of wrapping */
+  .filter-inner { padding: 8px 14px; gap: 10px; }
+  .size-field .input { width: 96px; }
+  .condition-chips {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+  .condition-chips::-webkit-scrollbar { display: none; }
+  .chip { white-space: nowrap; }
+  .result-summary { margin-left: 0; flex-basis: 100%; padding-bottom: 0; }
+
+  /* One pane at a time, full height */
   .split { flex-direction: column; }
-  .map-pane { flex: none; height: 320px; }
-  .results-pane { max-width: none; border-left: none; border-top: 1px solid var(--grid); }
+  .split[data-view="list"] .map-pane { display: none; }
+  .split[data-view="map"] .results-pane { display: none; }
+  .map-pane { flex: 1; height: auto; }
+  .results-pane {
+    max-width: none;
+    border-left: none;
+    padding-bottom: 72px; /* room for the floating toggle */
+  }
+
+  .mobile-toggle {
+    display: flex;
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--surface);
+    border: 1px solid var(--baseline);
+    border-radius: 999px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+  }
+  .mobile-toggle button {
+    font: inherit;
+    font-weight: 600;
+    padding: 10px 26px;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .mobile-toggle button.active {
+    background: var(--accent);
+    color: #ffffff;
+  }
 }
 
 /* ---------- Building cards ---------- */

@@ -68,7 +68,7 @@
   </section>
 
   <main class="app-main">
-    <div class="split" id="split">
+    <div class="split" id="split" data-view="list">
       <section class="map-pane" aria-label="Map of availabilities">
         <div id="map"></div>
       </section>
@@ -76,6 +76,10 @@
         <div id="results"></div>
       </section>
     </div>
+    <nav class="mobile-toggle" aria-label="Switch between list and map">
+      <button type="button" data-view="list" class="active">List</button>
+      <button type="button" data-view="map">Map</button>
+    </nav>
   </main>
 
   <script src="js/vendor/leaflet/leaflet.js"></script>

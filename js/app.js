@@ -428,12 +428,48 @@
     run();
   });
 
-  // Clicking a building card header pans the map to it.
+  // ---------- Mobile list/map toggle ----------
+  // Below 860px only one pane shows at a time; the floating toggle flips them.
+  // Leaflet can't measure a hidden container, so re-measure on every switch.
+
+  var split = document.getElementById("split");
+  var mapEverShown = false;
+
+  function isMobile() {
+    return window.matchMedia("(max-width: 860px)").matches;
+  }
+
+  function setMobileView(view) {
+    split.dataset.view = view;
+    document.querySelectorAll(".mobile-toggle button").forEach(function (btn) {
+      btn.classList.toggle("active", btn.dataset.view === view);
+    });
+    if (view === "map") {
+      map.invalidateSize();
+      if (!mapEverShown) {
+        mapEverShown = true;
+        var bounds = L.latLngBounds(BUILDINGS.map(function (b) { return [b.lat, b.lng]; }));
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+  }
+
+  document.querySelectorAll(".mobile-toggle button").forEach(function (btn) {
+    btn.addEventListener("click", function () { setMobileView(btn.dataset.view); });
+  });
+
+  window.addEventListener("resize", function () {
+    if (!isMobile()) map.invalidateSize();
+  });
+
+  // Clicking a building card header pans the map to it (switching to the
+  // map pane first on mobile).
   document.getElementById("results").addEventListener("click", function (e) {
     var head = e.target.closest(".bldg-head");
     if (!head) return;
     var b = BUILDINGS.find(function (x) { return x.id === head.dataset.bldg; });
     if (!b) return;
+    if (isMobile()) setMobileView("map");
     map.setView([b.lat, b.lng], Math.max(map.getZoom(), 15), { animate: true });
     markers[b.id].openPopup();
   });

@@ -37,6 +37,11 @@ the only thing loaded from the internet).
 
 ## Updating the data
 
+When you change `js/data.js`, also bump the `?v=` version string on the
+`css/styles.css`, `js/data.js`, and `js/app.js` tags in `index.html`.
+GitHub Pages and browsers cache those files, so without a new version
+string the live site keeps serving the old data.
+
 `js/data.js` is the single source of truth and is written to scale to the
 full 50+ building agency portfolio. Each building is one object with its
 coordinates and a list of spaces; the schema is documented at the top of

@@ -172,7 +172,7 @@ var BUILDINGS = [
       { unit: "P44", floor: 44, rsf: 5733, ask: 120, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Prebuilt" },
       { unit: "E37", floor: 37, rsf: 16400, ask: 93, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "LL will demolish; will consider dividing to 11,106 RSF" },
       { unit: "E36", floor: 36, rsf: 16400, ask: 93, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "LL will demolish; existing stair connects 35–36" },
-      { unit: "E35", floor: 35, rsf: 16750, ask: 93, condition: "Raw", available: "02/2026", status: "Available", notes: "Demolished; extra ceiling height" },
+      { unit: "E35", floor: 35, rsf: 16750, ask: 93, condition: "Raw", available: "Immediate", status: "Available", notes: "Demolished; extra ceiling height" },
       { unit: "P23", floor: 23, rsf: 6803, ask: 82, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Recently upgraded" },
       { unit: "P22", floor: 22, rsf: 5381, ask: 82, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Recently upgraded and partially furnished" },
       { unit: "P18", floor: 18, rsf: 7476, ask: 85, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Planned prebuilt" },
@@ -303,7 +303,7 @@ var BUILDINGS = [
       { unit: "P12", floor: 12, rsf: 7573, ask: 62, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Brand new prebuilt: 4 offices, 2 conference rooms, wellness room, pantry and open area for 32+" },
       { unit: "P11-A", floor: 11, rsf: 7231, ask: 60, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing installation with 6 offices, 2 conference rooms, open area and pantry. Partially furnished. LL will modify and upgrade or demolish and turnkey. Entire 11th floor (15,742 RSF) can be made available" },
       { unit: "P11-B", floor: 11, rsf: 5315, ask: 60, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing installation with 6 offices, 1 conference room, 2 meeting rooms, open area for 15 workstations and pantry. LL will modify and upgrade or demolish and turnkey. Entire 11th floor (15,742 RSF) can be made available" },
-      { unit: "P11-C", floor: 11, rsf: 3196, ask: 60, condition: "2nd Gen", available: "07/2026", status: "Available", notes: "Existing installation. LL will modify and upgrade or demolish and turnkey. Entire 11th floor (15,742 RSF) can be made available" },
+      { unit: "P11-C", floor: 11, rsf: 3196, ask: 60, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing installation. LL will modify and upgrade or demolish and turnkey. Entire 11th floor (15,742 RSF) can be made available" },
       { unit: "P8", floor: 8, rsf: 3758, ask: 60, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing installation. LL will modify and upgrade or turnkey to its high-end building standard" }
     ]
   },

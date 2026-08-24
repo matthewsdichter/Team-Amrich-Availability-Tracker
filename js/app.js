@@ -230,11 +230,18 @@
   function blockRow(block) {
     var conds = block.spaces.map(function (s) { return s.condition || "TBD"; });
     var uniqConds = conds.filter(function (c, i) { return conds.indexOf(c) === i; });
+    // Linked units can share a floor (partials that combine into an entire
+    // floor), so count distinct floors rather than members.
+    var floors = block.spaces.map(function (s) { return s.floor; })
+      .filter(function (f, i, a) { return a.indexOf(f) === i; }).length;
+    var partLabel = floors > 1
+      ? floors + " floors"
+      : block.spaces.length + " units on one floor";
     return "<div class=\"match-row block-row\">" +
       "<span class=\"match-unit\">" + escapeHtml(block.label) + "</span>" +
       "<div class=\"match-detail\">" +
         "<div class=\"match-line-1\">" +
-          "<span class=\"block-tag\">" + (block.linked ? "Connected" : "Contiguous") + " · " + block.spaces.length + " floors</span>" +
+          "<span class=\"block-tag\">" + (block.linked ? "Connected" : "Contiguous") + " · " + partLabel + "</span>" +
           "<span class=\"match-rsf\">" + fmtInt(block.rsf) + " RSF</span>" +
           "<span class=\"match-ask\">" + escapeHtml(block.askInfo.label) + "</span>" +
           "<span class=\"match-cond\">" + escapeHtml(uniqConds.join(" + ")) + "</span>" +

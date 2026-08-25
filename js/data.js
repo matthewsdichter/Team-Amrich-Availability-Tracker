@@ -410,5 +410,23 @@ var BUILDINGS = [
       { unit: "E4", floor: 4, rsf: 18500, ask: 65, condition: "2nd Gen", available: "TBD", status: "Available", notes: "Availability to be arranged; to be demolished and landlord will turnkey" },
       { unit: "E3", floor: 3, rsf: 18500, ask: 65, condition: "2nd Gen", available: "TBD", status: "Available", notes: "Availability to be arranged; to be demolished and landlord will turnkey" }
     ]
+  },
+  {
+    id: "1177-aofa",
+    name: "1177 Avenue of the Americas",
+    address: "1177 Avenue of the Americas (between W 45th & 46th St)",
+    submarket: "Rockefeller Center",
+    lat: 40.75731, lng: -73.98217,
+    spaces: [
+      { unit: "E37", floor: 37, rsf: 15301, ask: 125, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E32", floor: 32, rsf: 15301, ask: 120, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E31", floor: 31, rsf: 24828, ask: 120, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E15", floor: 15, rsf: 24764, ask: 100, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E12", floor: 12, rsf: 24764, ask: 95, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished; can be combined with 10 and 11 for a 74K RSF block" },
+      { unit: "E11", floor: 11, rsf: 24772, ask: 95, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished; can be combined with 10 and 12 for a 74K RSF block" },
+      { unit: "E10", floor: 10, rsf: 24788, ask: 95, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished; can be combined with 11 and 12 for a 74K RSF block" },
+      { unit: "E6", floor: 6, rsf: 33807, ask: 90, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "P4", floor: 4, rsf: 12710, ask: 85, condition: "2nd Gen", available: "Q3 2026", status: "Available", notes: "Built space coming back Q3 2026; landlord will modify/upgrade as needed" }
+    ]
   }
 ];

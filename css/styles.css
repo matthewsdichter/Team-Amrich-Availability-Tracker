@@ -409,3 +409,223 @@ body {
 .popup-rows { font-size: 12.5px; }
 .popup-rows div { padding: 2px 0; }
 .popup-more { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+/* ---------- Report: selection controls ---------- */
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.report-controls { display: flex; align-items: center; gap: 8px; }
+
+.sel-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.24);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+/* Checkbox column on every selectable row */
+.sel-wrap {
+  align-self: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.sel-box { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+.sel-none { visibility: hidden; }
+
+/* ---------- Report: modal ---------- */
+
+body.modal-open { overflow: hidden; }
+
+.report-modal { position: fixed; inset: 0; z-index: 1200; }
+.report-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55); }
+
+.report-dialog {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--page);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+.report-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.report-toolbar h2 { margin: 0; font-size: 15px; padding-bottom: 6px; }
+.report-fields { display: flex; gap: 12px; flex-wrap: wrap; }
+.report-field { display: flex; flex-direction: column; gap: 2px; }
+.report-field > span { font-size: 11px; color: var(--ink-2); }
+.report-field .input { width: 200px; }
+.report-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.report-scroll { flex: 1; overflow-y: auto; padding: 22px; }
+
+/* ---------- Report: the printable sheet ---------- */
+/* Fixed light palette — this is a document, not app chrome, and it has to
+   look the same on screen as it does on paper in either OS theme. */
+
+.report-sheet {
+  width: 8.5in;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0.55in 0.6in;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.18);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rpt-empty { color: #666; text-align: center; padding: 40px 0; }
+
+.rpt-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2px solid #1c3d6e;
+  padding-bottom: 8px;
+}
+.rpt-brand-name { font-size: 17px; font-weight: 700; letter-spacing: 0.06em; color: #1c3d6e; }
+.rpt-brand-sub { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #6b6b6b; }
+.rpt-date { font-size: 10.5px; color: #6b6b6b; }
+
+.rpt-title { font-size: 21px; margin: 18px 0 2px; font-weight: 600; }
+.rpt-for { font-size: 12px; color: #444; margin-bottom: 2px; }
+
+.rpt-criteria { font-size: 11px; color: #333; margin-top: 12px; }
+.rpt-criteria > span {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a8a8a;
+  margin-bottom: 2px;
+}
+
+.rpt-totals { display: flex; gap: 30px; margin: 14px 0 4px; }
+.rpt-totals > div { display: flex; flex-direction: column; }
+.rpt-total-v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: #1c3d6e; }
+.rpt-total-l { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8a8a; }
+
+.rpt-bldg { margin-top: 22px; }
+.rpt-bldg-name { font-size: 13.5px; font-weight: 700; margin: 0; }
+.rpt-bldg-meta { font-size: 10px; color: #6b6b6b; margin-bottom: 6px; }
+
+.rpt-table { width: 100%; border-collapse: collapse; }
+.rpt-table th {
+  text-align: left;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: #1c3d6e;
+  padding: 5px 7px;
+  font-weight: 600;
+}
+.rpt-table td {
+  padding: 6px 7px;
+  border-bottom: 1px solid #e2e2e2;
+  vertical-align: top;
+}
+.rpt-table tr.rpt-block td { background: #eef3fa; font-weight: 600; }
+
+.rpt-c0 { width: 10%; font-weight: 600; white-space: nowrap; }
+.rpt-c1 { width: 10%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rpt-c2 { width: 15%; font-variant-numeric: tabular-nums; }
+.rpt-c3 { width: 12%; }
+.rpt-c4 { width: 13%; }
+.rpt-c5 { width: 40%; color: #444; }
+th.rpt-c1 { text-align: right; }
+
+.rpt-foot {
+  margin-top: 26px;
+  padding-top: 8px;
+  border-top: 1px solid #d8d8d8;
+  font-size: 8.5px;
+  color: #8a8a8a;
+}
+
+@media (max-width: 860px) {
+  .report-controls { width: 100%; }
+  .report-controls .btn { flex: 1; }
+  .report-toolbar { gap: 10px; padding: 10px 14px; }
+  .report-field .input { width: 100%; }
+  .report-field { flex: 1 1 140px; }
+  .report-fields { flex: 1 1 100%; }
+  .report-actions { width: 100%; }
+  .report-actions .btn { flex: 1; }
+  /* The sheet keeps paper-like proportions and pans horizontally rather than
+     crushing the notes column into an unreadable sliver. */
+  .report-scroll { padding: 12px; overflow-x: auto; }
+  .report-sheet { width: 720px; max-width: none; padding: 20px 18px; }
+}
+
+/* ---------- Print: only the report sheet reaches paper ---------- */
+
+@media print {
+  .app-header,
+  .filter-bar,
+  .app-main,
+  .mobile-toggle,
+  .report-backdrop,
+  .report-toolbar { display: none !important; }
+
+  html, body { height: auto; background: #fff; }
+  body.modal-open { overflow: visible; }
+
+  .report-modal { position: static; }
+  .report-dialog {
+    position: static;
+    height: auto;
+    max-width: none;
+    margin: 0;
+    background: none;
+    box-shadow: none;
+    display: block;
+  }
+  .report-scroll { overflow: visible; padding: 0; }
+
+  .report-sheet {
+    width: auto;
+    max-width: none;
+    padding: 0;
+    box-shadow: none;
+    font-size: 9.5pt;
+  }
+
+  /* Keep a building's heading with its table, and repeat table headers when a
+     long building spills onto the next page. */
+  .rpt-bldg { break-inside: avoid; page-break-inside: avoid; }
+  .rpt-table thead { display: table-header-group; }
+  .rpt-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .rpt-head, .rpt-title, .rpt-totals { break-after: avoid; page-break-after: avoid; }
+
+  .rpt-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rpt-table tr.rpt-block td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+@page {
+  size: letter portrait;
+  margin: 0.5in 0.55in;
+}

@@ -19,6 +19,12 @@
     immediateOnly: false
   };
 
+  // Report selection. Keyed by building + units so a pick survives re-renders
+  // and filter changes; the space objects are re-resolved from BUILDINGS at
+  // report time rather than held onto here.
+  var selection = {};   // key -> { buildingId: string, units: [string] }
+  var lastResults = []; // most recent search results, for "select all shown"
+
   // ---------- Formatting ----------
 
   function fmtInt(n) { return Number(n || 0).toLocaleString("en-US"); }
@@ -37,6 +43,29 @@
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // ---------- Report selection ----------
+
+  function selKey(buildingId, units) { return buildingId + "|" + units.join("+"); }
+
+  function isSelected(key) { return Object.prototype.hasOwnProperty.call(selection, key); }
+
+  function selectionCount() { return Object.keys(selection).length; }
+
+  function toggleSelection(key, buildingId, units, on) {
+    if (on) selection[key] = { buildingId: buildingId, units: units };
+    else delete selection[key];
+  }
+
+  function selectBox(key, buildingId, units) {
+    return "<label class=\"sel-wrap\" title=\"Include in report\">" +
+      "<input type=\"checkbox\" class=\"sel-box\"" +
+        " data-key=\"" + escapeHtml(key) + "\"" +
+        " data-bldg=\"" + escapeHtml(buildingId) + "\"" +
+        " data-units=\"" + escapeHtml(units.join("+")) + "\"" +
+        (isSelected(key) ? " checked" : "") + ">" +
+    "</label>";
   }
 
   // ---------- Predicates ----------
@@ -210,9 +239,13 @@
     return "<span class=\"status-badge " + cls + "\"><span class=\"dot\"></span>" + escapeHtml(space.status) + "</span>";
   }
 
-  function singleRow(space) {
+  function singleRow(space, building) {
     var leaseOut = space.status !== "Available";
+    // Lease-out floors are shown for context but never go into a client report.
+    var box = leaseOut ? "<span class=\"sel-wrap sel-none\"></span>"
+                       : selectBox(selKey(building.id, [space.unit]), building.id, [space.unit]);
     return "<div class=\"match-row" + (leaseOut ? " lease-out" : "") + "\">" +
+      box +
       "<span class=\"match-unit\">" + escapeHtml(space.unit) + "</span>" +
       "<div class=\"match-detail\">" +
         "<div class=\"match-line-1\">" +
@@ -238,6 +271,7 @@
       ? floors + " floors"
       : block.spaces.length + " units on one floor";
     return "<div class=\"match-row block-row\">" +
+      selectBox(selKey(block.building.id, block.units), block.building.id, block.units) +
       "<span class=\"match-unit\">" + escapeHtml(block.label) + "</span>" +
       "<div class=\"match-detail\">" +
         "<div class=\"match-line-1\">" +
@@ -271,11 +305,12 @@
       // Contiguous blocks first — they're the suggestion the size search exists for.
       rows += r.blocks.map(blockRow).join("");
 
+      function toRow(s) { return singleRow(s, b); }
       if (filtering) {
-        rows += r.singles.map(singleRow).join("");
+        rows += r.singles.map(toRow).join("");
       } else {
         // Default view: full inventory, top floor first, lease-outs included.
-        rows += b.spaces.slice().sort(function (x, y) { return y.floor - x.floor; }).map(singleRow).join("");
+        rows += b.spaces.slice().sort(function (x, y) { return y.floor - x.floor; }).map(toRow).join("");
       }
 
       var activeSpaces = b.spaces.filter(isActive);
@@ -387,13 +422,197 @@
     });
   }
 
+  // ---------- Report builder ----------
+  // Selected rows are grouped by building (in portfolio order) and rendered
+  // into a paper-sized sheet. "Download PDF" hands that sheet to the browser's
+  // print pipeline, where Save as PDF produces the file.
+
+  function resolveSelection() {
+    // Re-resolve stored keys against BUILDINGS, dropping anything stale (a unit
+    // renamed or removed in data.js since it was picked).
+    var byBuilding = [];
+    BUILDINGS.forEach(function (b) {
+      var items = [];
+      Object.keys(selection).forEach(function (key) {
+        var sel = selection[key];
+        if (sel.buildingId !== b.id) return;
+        var spaces = sel.units.map(function (u) {
+          return b.spaces.find(function (sp) { return sp.unit === u; });
+        });
+        if (!spaces.every(Boolean)) return;
+        if (spaces.length === 1) items.push({ type: "space", space: spaces[0], rsf: spaces[0].rsf });
+        else {
+          var blk = makeBlock(b, spaces);
+          items.push({ type: "block", block: blk, rsf: blk.rsf });
+        }
+      });
+      if (!items.length) return;
+      // Blocks first, then single floors top-down — how a survey reads.
+      items.sort(function (x, y) {
+        if (x.type !== y.type) return x.type === "block" ? -1 : 1;
+        if (x.type === "block") return y.rsf - x.rsf;
+        return y.space.floor - x.space.floor;
+      });
+      byBuilding.push({ building: b, items: items });
+    });
+    return byBuilding;
+  }
+
+  function criteriaText() {
+    var parts = [];
+    if (state.minSf != null || state.maxSf != null) {
+      if (state.minSf != null && state.maxSf != null) {
+        parts.push(fmtInt(state.minSf) + "–" + fmtInt(state.maxSf) + " SF");
+      } else if (state.minSf != null) {
+        parts.push(fmtInt(state.minSf) + " SF and up");
+      } else {
+        parts.push("Up to " + fmtInt(state.maxSf) + " SF");
+      }
+    }
+    if (state.conditions.length) {
+      var labels = { "wb-raw": "Whiteboxed / Raw", "2nd-gen": "2nd Gen", "prebuilt": "Prebuilt" };
+      parts.push(state.conditions.map(function (k) { return labels[k]; }).join(" or "));
+    }
+    if (state.immediateOnly) parts.push("Immediate occupancy");
+    return parts.length ? parts.join("  ·  ") : "No size or condition filter applied";
+  }
+
+  function reportRow(item) {
+    var cells;
+    if (item.type === "space") {
+      var sp = item.space;
+      cells = [
+        escapeHtml(sp.unit),
+        fmtInt(sp.rsf),
+        fmtAsk(sp.ask) + (sp.askLab ? " · $" + fmtInt(sp.askLab) + " NNN lab" : ""),
+        escapeHtml(sp.condition || "TBD"),
+        escapeHtml(sp.available),
+        escapeHtml(sp.notes || "—")
+      ];
+    } else {
+      var blk = item.block;
+      var conds = blk.spaces.map(function (x) { return x.condition || "TBD"; });
+      var floors = blk.spaces.map(function (x) { return x.floor; })
+        .filter(function (f, i, a) { return a.indexOf(f) === i; }).length;
+      var tag = (blk.linked ? "Connected" : "Contiguous") + " · " +
+        (floors > 1 ? floors + " floors" : blk.spaces.length + " units on one floor");
+      cells = [
+        escapeHtml(blk.label),
+        fmtInt(blk.rsf),
+        escapeHtml(blk.askInfo.label),
+        escapeHtml(conds.filter(function (c, i) { return conds.indexOf(c) === i; }).join(" + ")),
+        escapeHtml(blk.available),
+        tag + (blk.askInfo.note ? " — " + escapeHtml(blk.askInfo.note) : "")
+      ];
+    }
+    return "<tr" + (item.type === "block" ? " class=\"rpt-block\"" : "") + ">" +
+      cells.map(function (c, i) {
+        return "<td class=\"rpt-c" + i + "\">" + c + "</td>";
+      }).join("") + "</tr>";
+  }
+
+  function renderReport() {
+    var groups = resolveSelection();
+    var sheet = document.getElementById("report-sheet");
+
+    if (!groups.length) {
+      sheet.innerHTML = "<div class=\"rpt-empty\">Nothing selected yet. " +
+        "Tick the box next to any space or contiguous block to add it.</div>";
+      return;
+    }
+
+    // Total RSF counts each floor once, even if it was picked both on its own
+    // and as part of a block.
+    var seen = {}, totalRsf = 0, floorCount = 0;
+    groups.forEach(function (g) {
+      g.items.forEach(function (item) {
+        var spaces = item.type === "space" ? [item.space] : item.block.spaces;
+        spaces.forEach(function (sp) {
+          var k = g.building.id + "|" + sp.unit;
+          if (seen[k]) return;
+          seen[k] = true;
+          totalRsf += sp.rsf;
+          floorCount++;
+        });
+      });
+    });
+
+    var title = document.getElementById("report-title").value.trim() || "Availability Report";
+    var preparedFor = document.getElementById("report-for").value.trim();
+    var today = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+    var head =
+      "<header class=\"rpt-head\">" +
+        "<div class=\"rpt-brand\">" +
+          "<div class=\"rpt-brand-name\">Team Amrich</div>" +
+          "<div class=\"rpt-brand-sub\">Availability Tracker</div>" +
+        "</div>" +
+        "<div class=\"rpt-date\">" + escapeHtml(today) + "</div>" +
+      "</header>" +
+      "<h1 class=\"rpt-title\">" + escapeHtml(title) + "</h1>" +
+      (preparedFor ? "<div class=\"rpt-for\">Prepared for " + escapeHtml(preparedFor) + "</div>" : "") +
+      "<div class=\"rpt-criteria\"><span>Search criteria</span>" + escapeHtml(criteriaText()) + "</div>" +
+      "<div class=\"rpt-totals\">" +
+        "<div><span class=\"rpt-total-v\">" + groups.length + "</span>" +
+          "<span class=\"rpt-total-l\">Building" + (groups.length === 1 ? "" : "s") + "</span></div>" +
+        "<div><span class=\"rpt-total-v\">" + floorCount + "</span>" +
+          "<span class=\"rpt-total-l\">Space" + (floorCount === 1 ? "" : "s") + "</span></div>" +
+        "<div><span class=\"rpt-total-v\">" + fmtInt(totalRsf) + "</span>" +
+          "<span class=\"rpt-total-l\">Total RSF</span></div>" +
+      "</div>";
+
+    var body = groups.map(function (g) {
+      var b = g.building;
+      return "<section class=\"rpt-bldg\">" +
+        "<h2 class=\"rpt-bldg-name\">" + escapeHtml(b.name) + "</h2>" +
+        "<div class=\"rpt-bldg-meta\">" + escapeHtml(b.address) + "  ·  " + escapeHtml(b.submarket) + "</div>" +
+        "<table class=\"rpt-table\">" +
+          "<thead><tr>" +
+            "<th class=\"rpt-c0\">Floor</th><th class=\"rpt-c1\">RSF</th>" +
+            "<th class=\"rpt-c2\">Asking rent</th><th class=\"rpt-c3\">Condition</th>" +
+            "<th class=\"rpt-c4\">Available</th><th class=\"rpt-c5\">Notes</th>" +
+          "</tr></thead>" +
+          "<tbody>" + g.items.map(reportRow).join("") + "</tbody>" +
+        "</table>" +
+      "</section>";
+    }).join("");
+
+    var foot = "<footer class=\"rpt-foot\">" +
+      "Information contained herein has been obtained from sources deemed reliable but is not guaranteed. " +
+      "Asking rents and availability are subject to change without notice." +
+    "</footer>";
+
+    sheet.innerHTML = head + body + foot;
+  }
+
+  function openReport() {
+    renderReport();
+    var modal = document.getElementById("report-modal");
+    modal.hidden = false;
+    document.body.classList.add("modal-open");
+    document.getElementById("report-title").focus();
+  }
+
+  function closeReport() {
+    document.getElementById("report-modal").hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+
+  function renderReportBar() {
+    var n = selectionCount();
+    document.getElementById("sel-count").textContent = n;
+    document.getElementById("btn-report").disabled = n === 0;
+  }
+
   // ---------- Wiring ----------
 
   function run() {
     var results = BUILDINGS.map(buildingResults);
+    lastResults = results;
     renderResults(results);
     renderSummary(results);
     updateMarkers(results);
+    renderReportBar();
   }
 
   function parseSf(value) {
@@ -424,6 +643,53 @@
     run();
   });
 
+  // Checkbox toggles. Rows are re-rendered on every search, so selection lives
+  // in `selection` and the boxes are re-checked from it, not the other way round.
+  document.getElementById("results").addEventListener("change", function (e) {
+    var box = e.target.closest(".sel-box");
+    if (!box) return;
+    toggleSelection(box.dataset.key, box.dataset.bldg, box.dataset.units.split("+"), box.checked);
+    renderReportBar();
+  });
+
+  document.getElementById("btn-select-all").addEventListener("click", function () {
+    // "Shown" means what the current filter surfaces: matched singles and
+    // contiguous options when filtering, otherwise every available space.
+    var filtering = hasAnyFilter();
+    lastResults.forEach(function (r) {
+      if (filtering && r.count === 0) return;
+      r.blocks.forEach(function (blk) {
+        toggleSelection(selKey(r.building.id, blk.units), r.building.id, blk.units, true);
+      });
+      var singles = filtering ? r.singles : r.building.spaces.filter(isActive);
+      singles.forEach(function (sp) {
+        toggleSelection(selKey(r.building.id, [sp.unit]), r.building.id, [sp.unit], true);
+      });
+    });
+    run();
+  });
+
+  document.getElementById("btn-report").addEventListener("click", openReport);
+  document.getElementById("btn-report-close").addEventListener("click", closeReport);
+
+  document.getElementById("report-modal").addEventListener("click", function (e) {
+    if (e.target.dataset.close) closeReport();
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !document.getElementById("report-modal").hidden) closeReport();
+  });
+
+  ["report-title", "report-for"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", renderReport);
+  });
+
+  document.getElementById("btn-report-print").addEventListener("click", function () {
+    // The print stylesheet hides the app and pages the sheet; the browser's
+    // "Save as PDF" destination writes the file.
+    window.print();
+  });
+
   document.getElementById("btn-clear").addEventListener("click", function () {
     state.minSf = state.maxSf = null;
     state.conditions = [];
@@ -432,6 +698,7 @@
     document.getElementById("max-sf").value = "";
     document.getElementById("immediate-only").checked = false;
     document.querySelectorAll(".chip.active").forEach(function (c) { c.classList.remove("active"); });
+    selection = {};
     run();
   });
 

@@ -33,7 +33,37 @@ the only thing loaded from the internet).
   first, with asking rent, condition, timing, notes, and lease-out flags.
 - **Portfolio stats** — buildings, available spaces, total available RSF,
   and the single largest contiguous block across the portfolio.
+- **PDF reports** — tick the box on any space or contiguous block (or hit
+  "Select all shown" after a search) and click **Report** to build a
+  client-ready survey. See below.
 - **Light & dark mode** — follows the system preference.
+
+## Generating a report
+
+Filter to what the tenant needs — say 10,000–15,000 SF, Prebuilt — then
+pick the spaces worth sending. Each row in the results list has a
+checkbox; "Select all shown" takes everything the current filter
+surfaced, contiguous blocks included. **Report** opens a preview where
+you can set a title and a "Prepared for" line, and **Download PDF** hands
+that sheet to the browser's print dialog — choose *Save as PDF* as the
+destination.
+
+The report groups the selection by building, leads with contiguous blocks,
+and prints the search criteria and totals up top so the client can see
+what was screened for. Notes:
+
+- Selections survive filter changes, so you can search 10–15K, pick a few,
+  widen to 25K, and keep adding. **Clear** resets the filters and the
+  selection together.
+- Lease-out floors are shown in the list for context but can't be
+  selected — they never belong in a client report.
+- Total RSF counts each floor once even when it was picked both on its own
+  and inside a block, so overlapping block picks don't inflate the number.
+
+There is no PDF library involved — the report is real HTML with a print
+stylesheet (`@media print` in `css/styles.css`), which keeps the text
+selectable and searchable in the finished PDF and keeps page breaks from
+splitting a building across two pages.
 
 ## Updating the data
 

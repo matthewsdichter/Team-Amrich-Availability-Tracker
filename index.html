@@ -6,7 +6,7 @@
   <title>Team Amrich Availability Tracker</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232a78d6'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3ETA%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/styles.css?v=20260831a">
+  <link rel="stylesheet" href="css/styles.css?v=20260831b">
 </head>
 <body>
   <header class="app-header">
@@ -64,6 +64,13 @@
 
       <button type="button" class="btn btn-ghost" id="btn-clear">Clear</button>
       <span class="result-summary" id="result-summary"></span>
+
+      <div class="report-controls">
+        <button type="button" class="btn btn-ghost" id="btn-select-all">Select all shown</button>
+        <button type="button" class="btn btn-primary" id="btn-report" disabled>
+          Report <span class="sel-count" id="sel-count">0</span>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -82,8 +89,35 @@
     </nav>
   </main>
 
+  <!-- Report builder: preview + print-to-PDF -->
+  <div class="report-modal" id="report-modal" hidden>
+    <div class="report-backdrop" data-close="1"></div>
+    <div class="report-dialog" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title">
+      <div class="report-toolbar">
+        <h2 id="report-dialog-title">Build report</h2>
+        <div class="report-fields">
+          <label class="report-field">
+            <span>Report title</span>
+            <input type="text" id="report-title" class="input" value="Availability Report">
+          </label>
+          <label class="report-field">
+            <span>Prepared for</span>
+            <input type="text" id="report-for" class="input" placeholder="Client or company name">
+          </label>
+        </div>
+        <div class="report-actions">
+          <button type="button" class="btn btn-ghost" id="btn-report-close">Close</button>
+          <button type="button" class="btn btn-primary" id="btn-report-print">Download PDF</button>
+        </div>
+      </div>
+      <div class="report-scroll">
+        <div class="report-sheet" id="report-sheet"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=20260831a"></script>
-  <script src="js/app.js?v=20260831a"></script>
+  <script src="js/data.js?v=20260831b"></script>
+  <script src="js/app.js?v=20260831b"></script>
 </body>
 </html>

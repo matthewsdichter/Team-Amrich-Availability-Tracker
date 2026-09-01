@@ -87,10 +87,10 @@ var BUILDINGS = [
     submarket: "Plaza District",
     lat: 40.76154, lng: -73.97095,
     spaces: [
-      { unit: "E10", floor: 10, rsf: 10392, ask: 150, condition: null, available: "Immediate", status: "Available", notes: "Landlord can provide a new turn-key installation" },
+      { unit: "E10", floor: 10, rsf: 10392, ask: 150, condition: null, available: "Immediate", status: "Lease Out", notes: "Landlord can provide a new turn-key installation" },
       { unit: "E9", floor: 9, rsf: 10392, ask: 150, condition: "Prebuilt", available: "TBD", status: "Available", notes: "Planned prebuilt for 10/1/2026 delivery" },
       { unit: "E7", floor: 7, rsf: 10392, ask: 140, condition: null, available: "Immediate", status: "Lease Out", notes: "" },
-      { unit: "E6", floor: 6, rsf: 10392, ask: 130, condition: "Prebuilt", available: "09/2026", status: "Available", notes: "New prebuilt: 11 offices, 3 conference rooms, open area for 30" }
+      { unit: "E6", floor: 6, rsf: 10392, ask: 130, condition: "Prebuilt", available: "09/2026", status: "Lease Out", notes: "New prebuilt: 11 offices, 3 conference rooms, open area for 30" }
     ]
   },
   {

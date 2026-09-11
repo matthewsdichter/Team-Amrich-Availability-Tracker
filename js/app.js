@@ -543,10 +543,6 @@
 
     var head =
       "<header class=\"rpt-head\">" +
-        "<div class=\"rpt-brand\">" +
-          "<div class=\"rpt-brand-name\">Team Amrich</div>" +
-          "<div class=\"rpt-brand-sub\">Availability Tracker</div>" +
-        "</div>" +
         "<div class=\"rpt-date\">" + escapeHtml(today) + "</div>" +
       "</header>" +
       "<h1 class=\"rpt-title\">" + escapeHtml(title) + "</h1>" +

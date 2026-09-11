@@ -502,15 +502,13 @@ body.modal-open { overflow: hidden; }
 .rpt-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   border-bottom: 2px solid #1c3d6e;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
 }
-.rpt-brand-name { font-size: 17px; font-weight: 700; letter-spacing: 0.06em; color: #1c3d6e; }
-.rpt-brand-sub { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #6b6b6b; }
 .rpt-date { font-size: 10.5px; color: #6b6b6b; }
 
-.rpt-title { font-size: 21px; margin: 18px 0 2px; font-weight: 600; }
+.rpt-title { font-size: 21px; margin: 12px 0 2px; font-weight: 600; }
 .rpt-for { font-size: 12px; color: #444; margin-bottom: 2px; }
 
 .rpt-criteria { font-size: 11px; color: #333; margin-top: 12px; }

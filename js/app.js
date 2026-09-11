@@ -45,6 +45,319 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // ---------- Status overrides ----------
+  // `data.js` is the source of truth for inventory; `status.js` carries only
+  // status changes made from the site. Overrides are applied onto BUILDINGS at
+  // boot, so everything downstream — search, stats, blocks, markers, report —
+  // sees the corrected status without knowing this layer exists.
+  //
+  // Editing writes status.js back to the repo through the GitHub contents API,
+  // which is why a token is needed to edit but never to read.
+
+  var STATUS_REPO = {
+    owner: "matthewsdichter",
+    repo: "Team-Amrich-Availability-Tracker",
+    branch: "main",
+    path: "js/status.js"
+  };
+
+  var STATUSES = ["Available", "Lease Out", "Leased"];
+  var TOKEN_KEY = "ta-tracker-gh-token";
+  var PENDING_KEY = "ta-tracker-pending-status";
+
+  var overrides = {};      // key -> status, as last read from status.js
+  var pending = {};        // key -> status (null = drop the override), not yet committed
+  var editing = false;
+  var saveTimer = null;
+
+  function spaceKey(buildingId, unit) { return buildingId + "|" + unit; }
+
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
+
+  function getToken() { return lsGet(TOKEN_KEY) || ""; }
+  function pendingCount() { return Object.keys(pending).length; }
+
+  function findBuilding(id) {
+    return BUILDINGS.find(function (b) { return b.id === id; });
+  }
+
+  // Remember what data.js shipped, so clearing an override restores it.
+  function captureBaseStatus() {
+    BUILDINGS.forEach(function (b) {
+      b.spaces.forEach(function (s) { s.baseStatus = s.status; });
+    });
+  }
+
+  function applyOverrides() {
+    BUILDINGS.forEach(function (b) {
+      b.spaces.forEach(function (s) {
+        var key = spaceKey(b.id, s.unit);
+        var val = Object.prototype.hasOwnProperty.call(pending, key) ? pending[key] : overrides[key];
+        s.status = val || s.baseStatus;
+      });
+    });
+  }
+
+  // A space that is no longer available has no business in a client report.
+  function dropSelectionsFor(buildingId, unit) {
+    Object.keys(selection).forEach(function (k) {
+      var sel = selection[k];
+      if (sel.buildingId === buildingId && sel.units.indexOf(unit) !== -1) delete selection[k];
+    });
+  }
+
+  function setStatus(buildingId, unit, status) {
+    var building = findBuilding(buildingId);
+    var space = building && building.spaces.find(function (s) { return s.unit === unit; });
+    if (!space || STATUSES.indexOf(status) === -1) return;
+
+    pending[spaceKey(buildingId, unit)] = status === space.baseStatus ? null : status;
+    lsSet(PENDING_KEY, JSON.stringify(pending));
+    applyOverrides();
+    if (status !== "Available") dropSelectionsFor(buildingId, unit);
+    scheduleSave();
+    refreshView();
+
+    // The re-render replaces the dropdown that was just used; put focus back
+    // on its replacement so keyboard use doesn't get thrown off the row.
+    var again = document.querySelector('.status-pick[data-bldg="' + buildingId +
+      '"][data-unit="' + unit + '"]');
+    if (again) again.focus();
+  }
+
+  // ---------- Overrides: file format ----------
+
+  var STATUS_HEADER = [
+    "/* ============================================================================",
+    "   Team Amrich — status overrides",
+    "   ============================================================================",
+    "   Written by the tracker's edit mode. `data.js` stays the source of truth for",
+    "   inventory; this file carries only status, keyed by \"<building id>|<unit>\".",
+    "   \"Lease Out\" is shown but flagged; \"Leased\" is hidden everywhere. Remove an",
+    "   entry to put the space back to whatever data.js says.",
+    "   ========================================================================= */",
+    "",
+    ""
+  ].join("\n");
+
+  function serializeOverrides(map) {
+    var payload = { updated: new Date().toISOString(), spaces: map };
+    return STATUS_HEADER + "window.STATUS_OVERRIDES = " + JSON.stringify(payload, null, 2) + ";\n";
+  }
+
+  // The header comment is full of "=" rules, so anchor on the assignment.
+  function parseOverridesFile(text) {
+    var at = text.indexOf("window.STATUS_OVERRIDES");
+    var eq = at === -1 ? -1 : text.indexOf("=", at);
+    if (eq === -1) throw new Error("status.js is not in the expected shape");
+    var obj = JSON.parse(text.slice(eq + 1).trim().replace(/;$/, ""));
+    return (obj && obj.spaces) || {};
+  }
+
+  function utf8ToBase64(str) {
+    var bytes = new TextEncoder().encode(str), bin = "";
+    bytes.forEach(function (b) { bin += String.fromCharCode(b); });
+    return window.btoa(bin);
+  }
+
+  function base64ToUtf8(b64) {
+    var bin = window.atob(String(b64).replace(/\s/g, ""));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  // ---------- Overrides: GitHub read/write ----------
+
+  function ghHeaders(token) {
+    return {
+      "Authorization": "Bearer " + token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    };
+  }
+
+  function ghUrl() {
+    return "https://api.github.com/repos/" + STATUS_REPO.owner + "/" + STATUS_REPO.repo +
+      "/contents/" + STATUS_REPO.path;
+  }
+
+  function ghError(res, body) {
+    var detail = (body && body.message) || res.statusText || ("HTTP " + res.status);
+    if (res.status === 401) return new Error("GitHub rejected the token — it may have expired.");
+    if (res.status === 403) return new Error("Token can't write here — it needs Contents: Read and write on this repo.");
+    if (res.status === 404) return new Error("Repo or file not visible to this token — check the token's repository access.");
+    if (res.status === 409 || res.status === 422) {
+      var err = new Error("Someone else saved first — retrying.");
+      err.conflict = true;
+      return err;
+    }
+    return new Error(detail);
+  }
+
+  function ghJsonError(res) {
+    return res.json().catch(function () { return {}; }).then(function (body) { throw ghError(res, body); });
+  }
+
+  function ghFetchFile(token) {
+    var url = ghUrl() + "?ref=" + encodeURIComponent(STATUS_REPO.branch) + "&t=" + Date.now();
+    return fetch(url, { headers: ghHeaders(token), cache: "no-store" }).then(function (res) {
+      if (res.status === 404) return { sha: null, spaces: {} };   // first write creates it
+      if (!res.ok) return ghJsonError(res);
+      return res.json().then(function (body) {
+        return { sha: body.sha, spaces: parseOverridesFile(base64ToUtf8(body.content)) };
+      });
+    });
+  }
+
+  function ghPutFile(token, text, sha, message) {
+    return fetch(ghUrl(), {
+      method: "PUT",
+      headers: ghHeaders(token),
+      body: JSON.stringify({
+        message: message,
+        content: utf8ToBase64(text),
+        branch: STATUS_REPO.branch,
+        sha: sha || undefined
+      })
+    }).then(function (res) {
+      if (!res.ok) return ghJsonError(res);
+      return res.json();
+    });
+  }
+
+  function commitMessage(batch) {
+    var parts = Object.keys(batch).map(function (k) {
+      var bits = k.split("|");
+      var b = findBuilding(bits[0]);
+      return (b ? b.name : bits[0]) + " " + bits[1] + " → " + (batch[k] || "Available");
+    });
+    var head = parts.slice(0, 3).join("; ");
+    if (parts.length > 3) head += " (+" + (parts.length - 3) + " more)";
+    return "Status update: " + head;
+  }
+
+  // Re-read before writing and lay this batch over what's there, so two people
+  // editing at once merge instead of clobbering each other.
+  function commitBatch(token, batch, attempt) {
+    return ghFetchFile(token).then(function (file) {
+      var merged = {};
+      Object.keys(file.spaces).forEach(function (k) { merged[k] = file.spaces[k]; });
+      Object.keys(batch).forEach(function (k) {
+        if (batch[k] == null) delete merged[k];
+        else merged[k] = batch[k];
+      });
+      return ghPutFile(token, serializeOverrides(merged), file.sha, commitMessage(batch))
+        .then(function () { return merged; })
+        .catch(function (err) {
+          if (err.conflict && attempt < 2) return commitBatch(token, batch, attempt + 1);
+          throw err;
+        });
+    });
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    setSaveState("pending");
+    saveTimer = setTimeout(saveNow, 1200);   // batch a burst of edits into one commit
+  }
+
+  function saveNow() {
+    saveTimer = null;
+    if (!pendingCount()) { setSaveState("idle"); return; }
+
+    var token = getToken();
+    if (!token) { setSaveState("error", "add a token to publish"); return; }
+
+    var batch = {};
+    Object.keys(pending).forEach(function (k) { batch[k] = pending[k]; });
+    setSaveState("saving");
+
+    commitBatch(token, batch, 0).then(function (merged) {
+      overrides = merged;
+      // Keep anything changed again while the request was in flight.
+      Object.keys(batch).forEach(function (k) {
+        if (pending[k] === batch[k]) delete pending[k];
+      });
+      if (pendingCount()) lsSet(PENDING_KEY, JSON.stringify(pending));
+      else lsDel(PENDING_KEY);
+      applyOverrides();
+      refreshView();
+      if (pendingCount()) scheduleSave();
+      else setSaveState("saved");
+    }).catch(function (err) {
+      setSaveState("error", err.message || String(err));
+    });
+  }
+
+  // ---------- Overrides: load ----------
+
+  function adoptOverrides(source) {
+    overrides = (source && source.spaces) || {};
+    applyOverrides();
+  }
+
+  function loadOverrides() {
+    var saved = lsGet(PENDING_KEY);
+    if (saved) {
+      try { pending = JSON.parse(saved) || {}; } catch (e) { pending = {}; }
+    }
+    adoptOverrides(window.STATUS_OVERRIDES);
+  }
+
+  // The script tag may be served from cache, which would show an editor stale
+  // data right after they committed. Re-pull past the cache on load.
+  function refreshOverrides() {
+    if (location.protocol === "file:") return;
+    var s = document.createElement("script");
+    s.src = "js/status.js?t=" + Date.now();
+    s.onload = function () {
+      adoptOverrides(window.STATUS_OVERRIDES);
+      refreshView();
+      s.remove();
+    };
+    s.onerror = function () { s.remove(); };
+    document.head.appendChild(s);
+  }
+
+  // ---------- Edit mode ----------
+
+  function setEditing(on) {
+    editing = on;
+    document.body.classList.toggle("editing", on);
+    document.getElementById("btn-edit").classList.toggle("active", on);
+    document.getElementById("btn-edit").textContent = on ? "Done editing" : "Edit";
+    refreshView();
+    if (pendingCount()) scheduleSave();
+  }
+
+  function setSaveState(state, msg) {
+    var el = document.getElementById("save-state");
+    var n = pendingCount();
+    var text = "";
+    if (state === "pending") text = n + " unsaved change" + (n === 1 ? "" : "s");
+    else if (state === "saving") text = "Publishing…";
+    else if (state === "saved") text = "Published ✓";
+    else if (state === "error") text = "Not published — " + (msg || "unknown error") + " · Retry";
+    el.textContent = text;
+    el.hidden = !text;
+    el.className = "save-state save-" + state;
+    el.title = state === "error" ? "Click to try again" : "";
+  }
+
+  function statusControl(building, space) {
+    var opts = STATUSES.map(function (s) {
+      return "<option value=\"" + escapeHtml(s) + "\"" + (s === space.status ? " selected" : "") + ">" +
+        escapeHtml(s) + "</option>";
+    }).join("");
+    return "<select class=\"status-pick\" data-bldg=\"" + escapeHtml(building.id) + "\"" +
+      " data-unit=\"" + escapeHtml(space.unit) + "\"" +
+      " aria-label=\"Status for " + escapeHtml(building.name) + " " + escapeHtml(space.unit) + "\">" +
+      opts + "</select>";
+  }
+
   // ---------- Report selection ----------
 
   function selKey(buildingId, units) { return buildingId + "|" + units.join("+"); }
@@ -72,6 +385,7 @@
 
   function isFullFloor(space) { return space.unit.charAt(0) === "E"; }
   function isActive(space) { return space.status === "Available"; }
+  function isLeased(space) { return space.status === "Leased"; }
   function isImmediate(space) { return String(space.available).toLowerCase() === "immediate"; }
 
   function conditionMatches(space) {
@@ -235,16 +549,18 @@
   // ---------- Results panel ----------
 
   function statusBadge(space) {
-    var cls = space.status === "Available" ? "st-available" : "st-lease-out";
+    var cls = space.status === "Available" ? "st-available"
+            : space.status === "Leased" ? "st-leased" : "st-lease-out";
     return "<span class=\"status-badge " + cls + "\"><span class=\"dot\"></span>" + escapeHtml(space.status) + "</span>";
   }
 
   function singleRow(space, building) {
-    var leaseOut = space.status !== "Available";
-    // Lease-out floors are shown for context but never go into a client report.
-    var box = leaseOut ? "<span class=\"sel-wrap sel-none\"></span>"
-                       : selectBox(selKey(building.id, [space.unit]), building.id, [space.unit]);
-    return "<div class=\"match-row" + (leaseOut ? " lease-out" : "") + "\">" +
+    var flagged = space.status !== "Available";
+    // Flagged floors are shown for context but never go into a client report.
+    var box = flagged ? "<span class=\"sel-wrap sel-none\"></span>"
+                      : selectBox(selKey(building.id, [space.unit]), building.id, [space.unit]);
+    var rowCls = flagged ? (isLeased(space) ? " leased" : " lease-out") : "";
+    return "<div class=\"match-row" + rowCls + "\">" +
       box +
       "<span class=\"match-unit\">" + escapeHtml(space.unit) + "</span>" +
       "<div class=\"match-detail\">" +
@@ -253,10 +569,11 @@
           "<span class=\"match-ask\">" + fmtAsk(space.ask) + (space.askLab ? " · $" + fmtInt(space.askLab) + " NNN lab" : "") + "</span>" +
           "<span class=\"match-cond\">" + escapeHtml(space.condition || "Condition TBD") + "</span>" +
           "<span class=\"match-avail\">" + escapeHtml(space.available) + "</span>" +
-          (leaseOut ? statusBadge(space) : "") +
+          (flagged ? statusBadge(space) : "") +
         "</div>" +
         (space.notes ? "<div class=\"match-notes\">" + escapeHtml(space.notes) + "</div>" : "") +
       "</div>" +
+      (editing ? statusControl(building, space) : "") +
     "</div>";
   }
 
@@ -310,7 +627,11 @@
         rows += r.singles.map(toRow).join("");
       } else {
         // Default view: full inventory, top floor first, lease-outs included.
-        rows += b.spaces.slice().sort(function (x, y) { return y.floor - x.floor; }).map(toRow).join("");
+        // Leased space is gone from the site; editing brings it back so it
+        // can be restored.
+        rows += b.spaces.slice()
+          .filter(function (s) { return editing || !isLeased(s); })
+          .sort(function (x, y) { return y.floor - x.floor; }).map(toRow).join("");
       }
 
       var activeSpaces = b.spaces.filter(isActive);
@@ -611,6 +932,11 @@
     renderReportBar();
   }
 
+  function refreshView() {
+    renderStats();
+    run();
+  }
+
   function parseSf(value) {
     var n = Number(String(value).replace(/[^0-9.]/g, ""));
     return value.trim() === "" || isNaN(n) || n <= 0 ? null : n;
@@ -642,6 +968,11 @@
   // Checkbox toggles. Rows are re-rendered on every search, so selection lives
   // in `selection` and the boxes are re-checked from it, not the other way round.
   document.getElementById("results").addEventListener("change", function (e) {
+    var pick = e.target.closest(".status-pick");
+    if (pick) {
+      setStatus(pick.dataset.bldg, pick.dataset.unit, pick.value);
+      return;
+    }
     var box = e.target.closest(".sel-box");
     if (!box) return;
     toggleSelection(box.dataset.key, box.dataset.bldg, box.dataset.units.split("+"), box.checked);
@@ -698,6 +1029,67 @@
     run();
   });
 
+  // ---------- Edit mode wiring ----------
+
+  function openToken() {
+    document.getElementById("token-input").value = getToken();
+    document.getElementById("token-modal").hidden = false;
+    document.body.classList.add("modal-open");
+    document.getElementById("token-input").focus();
+  }
+
+  function closeToken() {
+    document.getElementById("token-modal").hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+
+  document.getElementById("btn-edit").addEventListener("click", function () {
+    // Editing publishes to the repo, so there's nothing to enter without a token.
+    if (!editing && !getToken()) { openToken(); return; }
+    setEditing(!editing);
+  });
+
+  document.getElementById("save-state").addEventListener("click", function () {
+    if (this.classList.contains("save-error")) {
+      if (!getToken()) openToken();
+      else saveNow();
+    }
+  });
+
+  document.getElementById("btn-token-save").addEventListener("click", function () {
+    var val = document.getElementById("token-input").value.trim();
+    if (!val) return;
+    lsSet(TOKEN_KEY, val);
+    closeToken();
+    setEditing(true);
+    if (pendingCount()) saveNow();
+  });
+
+  document.getElementById("btn-token-forget").addEventListener("click", function () {
+    lsDel(TOKEN_KEY);
+    document.getElementById("token-input").value = "";
+    closeToken();
+    if (editing) setEditing(false);
+  });
+
+  document.getElementById("btn-token-cancel").addEventListener("click", closeToken);
+
+  document.getElementById("token-modal").addEventListener("click", function (e) {
+    if (e.target.dataset.tclose) closeToken();
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !document.getElementById("token-modal").hidden) closeToken();
+  });
+
+  // Edits live in localStorage until they reach GitHub, but a closed tab is
+  // still a surprise worth warning about.
+  window.addEventListener("beforeunload", function (e) {
+    if (!pendingCount()) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
   // ---------- Mobile list/map toggle ----------
   // Below 860px only one pane shows at a time; the floating toggle flips them.
   // Leaflet can't measure a hidden container, so re-measure on every switch.
@@ -746,7 +1138,16 @@
 
   // ---------- Init ----------
 
+  captureBaseStatus();
+  loadOverrides();
   initMarkers();
   renderStats();
   run();
+
+  // Edits from a previous visit that never reached GitHub.
+  if (pendingCount()) {
+    if (getToken()) scheduleSave();
+    else setSaveState("error", "add a token to publish");
+  }
+  refreshOverrides();
 })();

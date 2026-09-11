@@ -6,7 +6,7 @@
   <title>Team Amrich Availability Tracker</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232a78d6'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3ETA%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="js/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/styles.css?v=20260911a">
+  <link rel="stylesheet" href="css/styles.css?v=20260911b">
 </head>
 <body>
   <header class="app-header">
@@ -66,6 +66,8 @@
       <span class="result-summary" id="result-summary"></span>
 
       <div class="report-controls">
+        <button type="button" class="btn btn-ghost" id="btn-edit">Edit</button>
+        <span class="save-state" id="save-state" hidden></span>
         <button type="button" class="btn btn-ghost" id="btn-select-all">Select all shown</button>
         <button type="button" class="btn btn-primary" id="btn-report" disabled>
           Report <span class="sel-count" id="sel-count">0</span>
@@ -116,8 +118,39 @@
     </div>
   </div>
 
+  <!-- Publish access: the token that lets this browser commit status changes -->
+  <div class="token-modal" id="token-modal" hidden>
+    <div class="token-backdrop" data-tclose="1"></div>
+    <div class="token-dialog" role="dialog" aria-modal="true" aria-labelledby="token-title">
+      <h2 id="token-title">Publish access</h2>
+      <p class="token-help">
+        Marking a space writes a small status file back to the tracker's repository,
+        so everyone on the team sees the change. That needs a GitHub token with
+        write access to this one repo. Reading the site never needs one.
+      </p>
+      <ol class="token-steps">
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → fine-grained tokens</a>.</li>
+        <li>Repository access → <strong>Only select repositories</strong> → <strong>Team-Amrich-Availability-Tracker</strong>.</li>
+        <li>Repository permissions → <strong>Contents: Read and write</strong>.</li>
+        <li>Set an expiry you're comfortable with, generate, and paste it below.</li>
+      </ol>
+      <input type="password" id="token-input" class="input" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      <p class="token-warn">
+        Stored in this browser only — never sent anywhere but GitHub. Anyone who can
+        use this computer can read it, so skip this on a shared machine, and revoke
+        the token on GitHub if it ever gets out.
+      </p>
+      <div class="token-actions">
+        <button type="button" class="btn btn-ghost" id="btn-token-forget">Forget token</button>
+        <button type="button" class="btn btn-ghost" id="btn-token-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-token-save">Save token</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=20260911a"></script>
-  <script src="js/app.js?v=20260911a"></script>
+  <script src="js/data.js?v=20260911b"></script>
+  <script src="js/status.js?v=20260911b"></script>
+  <script src="js/app.js?v=20260911b"></script>
 </body>
 </html>

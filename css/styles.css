@@ -579,6 +579,103 @@ th.rpt-c1 { text-align: right; }
   .report-sheet { width: 720px; max-width: none; padding: 20px 18px; }
 }
 
+/* ---------- Edit mode: status controls ---------- */
+
+.btn-ghost.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.save-state {
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--baseline);
+  color: var(--ink-2);
+}
+.save-saving { color: var(--ink-2); }
+.save-saved { color: var(--status-good); border-color: var(--status-good); }
+.save-pending { color: var(--status-warning); border-color: var(--status-warning); }
+.save-error {
+  color: var(--status-serious);
+  border-color: var(--status-serious);
+  cursor: pointer;
+  white-space: normal;
+}
+
+/* The per-row status dropdown only exists while editing. */
+.status-pick {
+  font: inherit;
+  font-size: 12px;
+  align-self: center;
+  flex: none;
+  padding: 3px 6px;
+  border-radius: 7px;
+  border: 1px solid var(--baseline);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.status-pick:hover { border-color: var(--accent); }
+
+/* Leased space is hidden outside edit mode; while editing it shows struck
+   through so it reads as "gone, but recoverable". */
+.match-row.leased { opacity: 0.5; }
+.match-row.leased .match-unit,
+.match-row.leased .match-rsf,
+.match-row.leased .match-ask { text-decoration: line-through; }
+
+.status-badge.st-leased .dot { background: var(--status-neutral); }
+
+body.editing .match-row { align-items: center; }
+
+/* ---------- Edit mode: token dialog ---------- */
+
+.token-modal { position: fixed; inset: 0; z-index: 1300; }
+.token-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55); }
+
+.token-dialog {
+  position: relative;
+  max-width: 520px;
+  margin: 8vh auto 0;
+  padding: 20px 22px;
+  border-radius: 12px;
+  background: var(--page);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+.token-dialog h2 { margin: 0 0 8px; font-size: 16px; }
+.token-help { margin: 0 0 12px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+
+.token-steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.token-steps a { color: var(--accent); }
+
+.token-dialog .input { width: 100%; box-sizing: border-box; }
+
+.token-warn {
+  margin: 10px 0 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  border-left: 3px solid var(--status-warning);
+  padding-left: 10px;
+}
+
+.token-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.token-actions #btn-token-forget { margin-right: auto; }
+
+@media (max-width: 860px) {
+  .token-dialog { margin: 0; border-radius: 0; min-height: 100%; }
+  .status-pick { font-size: 13px; }
+}
+
 /* ---------- Print: only the report sheet reaches paper ---------- */
 
 @media print {
@@ -587,6 +684,7 @@ th.rpt-c1 { text-align: right; }
   .app-main,
   .mobile-toggle,
   .report-backdrop,
+  .token-modal,
   .report-toolbar { display: none !important; }
 
   html, body { height: auto; background: #fff; }

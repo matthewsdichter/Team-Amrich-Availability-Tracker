@@ -87,6 +87,8 @@ var BUILDINGS = [
     submarket: "Plaza District",
     lat: 40.76154, lng: -73.97095,
     spaces: [
+      { unit: "P27", floor: 27, rsf: 4437, ask: 165, condition: null, available: "06/2027", status: "Available", notes: "Suite 2703 — Landlord will turnkey to a new standard for a 7-10 year term" },
+      { unit: "P14", floor: 14, rsf: 2936, ask: 155, condition: "2nd Gen", available: "03/2027", status: "Available", notes: "Suite 1402 — move-in condition, mostly furnished, and Landlord will do some minor work. 3 offices, conference room, open area and pantry. Northeast corner with great views overlooking Park Ave and 57th St" },
       { unit: "E10", floor: 10, rsf: 10392, ask: 150, condition: null, available: "Immediate", status: "Available", notes: "Landlord can provide a new turn-key installation" },
       { unit: "E9", floor: 9, rsf: 10392, ask: 150, condition: "Prebuilt", available: "TBD", status: "Available", notes: "Planned prebuilt for 10/1/2026 delivery" },
       { unit: "E7", floor: 7, rsf: 10392, ask: 140, condition: null, available: "Immediate", status: "Lease Out", notes: "" },

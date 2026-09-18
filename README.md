@@ -54,8 +54,11 @@ Conventions:
   **entire** floors are treated as contiguous automatically.
 - `links` — declares connections that aren't consecutive entire floors
   (internal stairs, slab cuts), e.g. `[["P17", "E18"]]`.
-- `status: "Lease Out"` — keeps the floor visible (flagged) but removes
-  it from search results and block assembly.
+- `status: "Lease Out"` — a lease is out for signature; keeps the floor
+  visible (flagged) but removes it from search results and block assembly.
+- **Leased space comes out of the file.** Once a deal signs, delete the
+  space object entirely rather than flagging it — this is an availability
+  tracker, not a deal history, and dead floors are noise on a live call.
 - `ask: null` / `available: "TBD"` — supported everywhere and surfaced
   as TBD in results.
 - `condition: null` — unknown; shown as "Condition TBD" and excluded

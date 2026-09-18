@@ -30,7 +30,9 @@
                 (Whiteboxed and Raw are one bucket in the condition filter)
      available  "Immediate", "MM/YYYY", "Q1 2027", or "TBD"
      status     "Available" | "Lease Out"  (Lease Out floors are shown but
-                excluded from search matches and contiguous blocks)
+                excluded from search matches and contiguous blocks. Space
+                that has been leased is deleted from this file outright —
+                the tracker carries live availability only.)
      notes      free text shown on the card
    ========================================================================= */
 
@@ -64,8 +66,7 @@ var BUILDINGS = [
       { unit: "E12", floor: 12, rsf: 16183, ask: 74, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Full floor prebuilt space" },
       { unit: "E11", floor: 11, rsf: 15769, ask: 69, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Full floor prebuilt space" },
       { unit: "E10", floor: 10, rsf: 15918, ask: 69, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Full floor prebuilt space" },
-      { unit: "E9", floor: 9, rsf: 15931, ask: 69, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Full floor prebuilt space" },
-      { unit: "E7", floor: 7, rsf: 15931, ask: 66, condition: "Prebuilt", available: "Immediate", status: "Lease Out", notes: "Full floor prebuilt space" }
+      { unit: "E9", floor: 9, rsf: 15931, ask: 69, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Full floor prebuilt space" }
     ]
   },
   {

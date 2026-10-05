@@ -8,10 +8,12 @@
    ========================================================================= */
 
 window.STATUS_OVERRIDES = {
-  "updated": "2026-09-11T17:45:55.953Z",
+  "updated": "2026-10-05T12:00:00.000Z",
   "spaces": {
-    "499-park|E6": "Lease Out",
+    "499-park|E6": "Leased",
     "11-bryant-park|E15": "Leased",
-    "41-45-w25|E3": "Lease Out"
+    "11-bryant-park|E7": "Leased",
+    "41-45-w25|E3": "Lease Out",
+    "450-park|E6": "Leased"
   }
 };

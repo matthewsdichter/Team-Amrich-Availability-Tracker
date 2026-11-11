@@ -87,10 +87,12 @@ var BUILDINGS = [
     submarket: "Plaza District",
     lat: 40.76154, lng: -73.97095,
     spaces: [
-      { unit: "E10", floor: 10, rsf: 10392, ask: 150, condition: null, available: "Immediate", status: "Available", notes: "Landlord can provide a new turn-key installation" },
+      { unit: "P27", floor: 27, rsf: 4437, ask: 165, condition: "2nd Gen", available: "06/2027", status: "Available", notes: "Suite 2703 — Landlord will turnkey to a new standard for a 7-10 year term" },
+      { unit: "P14", floor: 14, rsf: 2936, ask: 155, condition: "2nd Gen", available: "03/2027", status: "Available", notes: "Suite 1402 — move-in condition, mostly furnished, and Landlord will do some minor work. 3 offices, conference room, open area and pantry. Northeast corner with great views overlooking Park Ave and 57th St" },
+      { unit: "E10", floor: 10, rsf: 10392, ask: 150, condition: null, available: "Immediate", status: "Lease Out", notes: "Landlord can provide a new turn-key installation" },
       { unit: "E9", floor: 9, rsf: 10392, ask: 150, condition: "Prebuilt", available: "TBD", status: "Available", notes: "Planned prebuilt for 10/1/2026 delivery" },
       { unit: "E7", floor: 7, rsf: 10392, ask: 140, condition: null, available: "Immediate", status: "Lease Out", notes: "" },
-      { unit: "E6", floor: 6, rsf: 10392, ask: 130, condition: "Prebuilt", available: "09/2026", status: "Available", notes: "New prebuilt: 11 offices, 3 conference rooms, open area for 30" }
+      { unit: "E6", floor: 6, rsf: 10392, ask: 130, condition: "Prebuilt", available: "09/2026", status: "Lease Out", notes: "New prebuilt: 11 offices, 3 conference rooms, open area for 30" }
     ]
   },
   {
@@ -132,11 +134,11 @@ var BUILDINGS = [
     lat: 40.76340, lng: -73.97770,
     spaces: [
       { unit: "P12", floor: 12, rsf: 6558, ask: 82, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Pending prebuilt space" },
-      { unit: "E11", floor: 11, rsf: 11046, ask: 79, condition: "Raw", available: "Immediate", status: "Available", notes: "Raw space; LL will turnkey or provide TI" },
-      { unit: "P10", floor: 10, rsf: 4842, ask: 74, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Prebuilt: 1 conference room, 2 offices, 2 phone rooms, open area for 22" },
-      { unit: "E7", floor: 7, rsf: 11046, ask: 78, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing showroom installation; LL will modify or demolish and turnkey" },
-      { unit: "P4-A", floor: 4, rsf: 4418, ask: 75, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
-      { unit: "P4-B", floor: 4, rsf: 5169, ask: 75, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
+      { unit: "E11", floor: 11, rsf: 11046, ask: 76, condition: "Raw", available: "Immediate", status: "Available", notes: "Raw space; LL will turnkey or provide TI" },
+      { unit: "P10", floor: 10, rsf: 4842, ask: 69, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Prebuilt: 1 conference room, 2 offices, 2 phone rooms, open area for 22" },
+      { unit: "E7", floor: 7, rsf: 11046, ask: 69, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing showroom installation; LL will modify or demolish and turnkey" },
+      { unit: "P4-A", floor: 4, rsf: 4418, ask: 69, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
+      { unit: "P4-B", floor: 4, rsf: 5169, ask: 69, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
       { unit: "P3", floor: 3, rsf: 4401, ask: 76, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Pending prebuilt space" }
     ]
   },
@@ -409,6 +411,24 @@ var BUILDINGS = [
     spaces: [
       { unit: "E4", floor: 4, rsf: 18500, ask: 65, condition: "2nd Gen", available: "TBD", status: "Available", notes: "Availability to be arranged; to be demolished and landlord will turnkey" },
       { unit: "E3", floor: 3, rsf: 18500, ask: 65, condition: "2nd Gen", available: "TBD", status: "Available", notes: "Availability to be arranged; to be demolished and landlord will turnkey" }
+    ]
+  },
+  {
+    id: "1177-aofa",
+    name: "1177 Avenue of the Americas",
+    address: "1177 Avenue of the Americas (between W 45th & 46th St)",
+    submarket: "Rockefeller Center",
+    lat: 40.75717, lng: -73.98195,
+    spaces: [
+      { unit: "E37", floor: 37, rsf: 15301, ask: 125, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E32", floor: 32, rsf: 15301, ask: 120, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E31", floor: 31, rsf: 24828, ask: 120, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E15", floor: 15, rsf: 24764, ask: 100, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "E12", floor: 12, rsf: 24764, ask: 95, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished; can be combined with 10 and 11 for a 74K RSF block" },
+      { unit: "E11", floor: 11, rsf: 24772, ask: 95, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished; can be combined with 10 and 12 for a 74K RSF block" },
+      { unit: "E10", floor: 10, rsf: 24788, ask: 95, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished; can be combined with 11 and 12 for a 74K RSF block" },
+      { unit: "E6", floor: 6, rsf: 33807, ask: 90, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "To be demolished" },
+      { unit: "P4", floor: 4, rsf: 12710, ask: 85, condition: "2nd Gen", available: "Q3 2026", status: "Available", notes: "Built space coming back Q3 2026; landlord will modify/upgrade as needed" }
     ]
   }
 ];

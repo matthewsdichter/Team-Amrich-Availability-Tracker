@@ -134,11 +134,11 @@ var BUILDINGS = [
     lat: 40.76340, lng: -73.97770,
     spaces: [
       { unit: "P12", floor: 12, rsf: 6558, ask: 82, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Pending prebuilt space" },
-      { unit: "E11", floor: 11, rsf: 11046, ask: 76, condition: "Raw", available: "Immediate", status: "Available", notes: "Raw space; LL will turnkey or provide TI" },
-      { unit: "P10", floor: 10, rsf: 4842, ask: 69, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Prebuilt: 1 conference room, 2 offices, 2 phone rooms, open area for 22" },
-      { unit: "E7", floor: 7, rsf: 11046, ask: 69, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing showroom installation; LL will modify or demolish and turnkey" },
-      { unit: "P4-A", floor: 4, rsf: 4418, ask: 69, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
-      { unit: "P4-B", floor: 4, rsf: 5169, ask: 69, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
+      { unit: "E11", floor: 11, rsf: 11046, ask: 79, condition: "Raw", available: "Immediate", status: "Available", notes: "Raw space; LL will turnkey or provide TI" },
+      { unit: "P10", floor: 10, rsf: 4842, ask: 74, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Prebuilt: 1 conference room, 2 offices, 2 phone rooms, open area for 22" },
+      { unit: "E7", floor: 7, rsf: 11046, ask: 78, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Existing showroom installation; LL will modify or demolish and turnkey" },
+      { unit: "P4-A", floor: 4, rsf: 4418, ask: 75, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
+      { unit: "P4-B", floor: 4, rsf: 5169, ask: 75, condition: "2nd Gen", available: "Immediate", status: "Available", notes: "Built showroom space; LL will modify and build out" },
       { unit: "P3", floor: 3, rsf: 4401, ask: 76, condition: "Prebuilt", available: "Immediate", status: "Available", notes: "Pending prebuilt space" }
     ]
   },
